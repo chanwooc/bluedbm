@@ -17,10 +17,11 @@ BSVFILES = Main.bsv Top.bsv \
 
 CPPFILES=main.cpp flash.cpp flash.h
 
-CONNECTALFLAGS = -D IMPORT_HOSTIF -D DataBusWidth=128 --clib rt
+CONNECTALFLAGS += -D NodeCount=2
+CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS -D DataBusWidth=128 --clib rt
 
 CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
-CONNECTALFLAGS += -P mkAuroraExt
+CONNECTALFLAGS += -P mkConnectalTop
 
 ifeq ($(BOARD), vc707)
 CONNECTALFLAGS += \
