@@ -204,6 +204,11 @@ interface AuroraExtIfc;
 	method Action setNodeIdx(HeaderField idx); 
 endinterface
 
+interface AuroraExtPins;
+   interface Vector#(AuroraExtPerQuad, Aurora_Pins#(1)) aurora_ext;
+   interface Aurora_Clock_Pins aurora_quad119;
+endinterface
+
 (* synthesize *)
 module mkAuroraExt#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk50) (AuroraExtIfc);
 	Reset defaultReset <- exposeCurrentReset;
