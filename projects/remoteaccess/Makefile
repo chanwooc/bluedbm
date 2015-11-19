@@ -18,19 +18,19 @@ BSVFILES = Main.bsv Top.bsv \
 CPPFILES=main.cpp interface.cpp 
 
 CONNECTALFLAGS += -D NodeCountLog=2
-CONNECTALFLAGS += -D IMPORT_HOSTIF -D DataBusWidth=128 --clib rt
+CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS -D DataBusWidth=128 --clib rt
 CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
-CONNECTALFLAGS += -P mkAuroraExt
+CONNECTALFLAGS += -P mkConnectalTop
 
-ifeq ($(BOARD), vc707)
+ifneq ($(BOARD), bluesim)
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_64b66b/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y24/aurora_64b66b_X1Y24.xci \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y25/aurora_64b66b_X1Y25.xci \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y26/aurora_64b66b_X1Y26.xci \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y27/aurora_64b66b_X1Y27.xci \
-	-C ../../misc/bluedbm.xdc \
 	-C ../../xilinx/aurora_64b66b/aurora_64b66b_exdes_119.xdc \
+	-C ../../misc/bluedbm.xdc \
 #	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y16/aurora_64b66b_X1Y16.xci \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y17/aurora_64b66b_X1Y17.xci \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_64b66b_X1Y18/aurora_64b66b_X1Y18.xci \

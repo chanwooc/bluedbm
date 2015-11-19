@@ -71,13 +71,9 @@ interface Top_Pins;
 	interface Aurora_Clock_Pins aurora_quad119;
 endinterface
 
-typedef 128 WordSz;
+(* synthesize *)
+module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop#(PhysAddrWidth,DataBusWidth,Top_Pins,NumberOfMasters));
 
-module mkConnectalTop#(HostInterface host) (ConnectalTop#(PhysAddrWidth,WordSz,Top_Pins,1));
-
-	Clock clk250 = host.derivedClock;
-	Reset rst250 = host.derivedReset;
-	
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
 
