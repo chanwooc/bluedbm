@@ -88,8 +88,8 @@ endinterface
 typedef 128 DmaBurstBytes; 
 Integer dmaBurstBytes = valueOf(DmaBurstBytes);
 Integer dmaBurstWords = dmaBurstBytes/wordBytes; //128/16 = 8
-Integer dmaBurstsPerPage = (pageSizeUser+dmaBurstBytes-1)/dmaBurstBytes; //ceiling, 65
-Integer dmaBurstWordsLast = (pageSizeUser%dmaBurstBytes)/wordBytes; //num bursts in last dma; 2 bursts
+Integer dmaBurstsPerPage = 65;//(pageSizeUser+dmaBurstBytes-1)/dmaBurstBytes; //ceiling, 65
+Integer dmaBurstWordsLast = 2;//(pageSizeUser%dmaBurstBytes)/wordBytes; //num bursts in last dma; 2 bursts
 Integer pagePadCnt = dmaBurstWords - dmaBurstWordsLast; //6
 Integer dmaAllocPageSizeLog = 14; //typically portal alloc page size is 16KB; MUST MATCH SW
 

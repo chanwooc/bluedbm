@@ -63,7 +63,7 @@ import AuroraExtImport::*;
 // defined by user
 import Main::*;
 
-typedef enum {FlashIndication, FlashRequest, HostMemServerIndication, HostMemServerRequest, HostMMURequest, HostMMUIndication
+typedef enum {FlashIndicationH2S, FlashRequestS2H, HostMemServerIndicationH2S, HostMemServerRequestS2H, HostMMURequestS2H, HostMMUIndicationH2S
 	} IfcNames deriving (Eq,Bits);
 
 interface Top_Pins;
