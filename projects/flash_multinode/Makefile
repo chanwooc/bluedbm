@@ -17,7 +17,7 @@ BSVFILES = Main.bsv Top.bsv \
 
 CPPFILES=main.cpp flash.cpp flash.h
 
-CONNECTALFLAGS += -D NodeCount=2
+CONNECTALFLAGS += -D NodeCountLog=2
 CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS -D DataBusWidth=128 --clib rt
 
 CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
