@@ -58,7 +58,7 @@ TagTableEntry writeTagTable[NUM_TAGS];
 TagTableEntry eraseTagTable[NUM_TAGS]; 
 FlashStatusT flashStatus[NUM_BUSES][CHIPS_PER_BUS][BLOCKS_PER_CHIP];
 
-int testPass = 1;
+bool testPass = true;
 bool verbose = true;
 int curReadsInFlight = 0;
 int curWritesInFlight = 0;
@@ -78,15 +78,16 @@ unsigned int hashAddrToData(int bus, int chip, int blk, int word) {
 
 bool checkReadData(int tag) {
 	TagTableEntry e = readTagTable[tag];
-	int goldenData;
+    bool pass = true;
+	unsigned int goldenData;
 	if (flashStatus[e.bus][e.chip][e.block]==WRITTEN) {
 		int numErrors = 0;
-		for (int word=0; word<PAGE_SIZE_VALID/sizeof(unsigned int); word++) {
+		for (unsigned int word=0; word<PAGE_SIZE_VALID/sizeof(unsigned int); word++) {
 			goldenData = hashAddrToData(e.bus, e.chip, e.block, word);
 			if (goldenData != readBuffers[tag][word]) {
 				fprintf(stderr, "LOG: **ERROR: read data mismatch! Expected: %x, read: %x\n", goldenData, readBuffers[tag][word]);
 				numErrors++; 
-				testPass = 0;
+				pass = false;
 			}
 		}
 		if (numErrors==0) {
@@ -95,7 +96,7 @@ bool checkReadData(int tag) {
 	}
 	else if (flashStatus[e.bus][e.chip][e.block]==ERASED) {
 		//only check first word. It may return 0 if bad block, or -1 if erased
-		if (readBuffers[tag][0]==-1) {
+		if (readBuffers[tag][0]==(unsigned int)-1) {
 			fprintf(stderr, "LOG: Read check pass on erased block!\n");
 		}
 		else if (readBuffers[tag][0]==0) {
@@ -103,13 +104,14 @@ bool checkReadData(int tag) {
 		}
 		else {
 			fprintf(stderr, "LOG: **ERROR: read data mismatch! Expected: ERASED, read: %x\n", readBuffers[tag][0]);
-			testPass = 0;
+			pass = false;
 		}
 	}
 	else {
 		fprintf(stderr, "LOG: **ERROR: flash block state unknown. Did you erase before write?\n");
-		testPass = 0;
+		pass = 0;
 	}
+    return pass;
 }
 
 class FlashIndication : public FlashIndicationWrapper
@@ -127,7 +129,7 @@ class FlashIndication : public FlashIndicationWrapper
 			}
 
 			//check 
-			checkReadData(tag);
+			testPass = checkReadData(tag);
 
 			pthread_mutex_lock(&flashReqMutex);
 			curReadsInFlight --;
@@ -322,19 +324,19 @@ void readPage(int bus, int chip, int block, int page, int tag) {
 int main(int argc, const char **argv)
 {
 
-	MemServerRequestProxy *hostMemServerRequest = new MemServerRequestProxy(IfcNames_HostMemServerRequest);
-	MMURequestProxy *dmap = new MMURequestProxy(IfcNames_HostMMURequest);
+	MemServerRequestProxy *hostMemServerRequest = new MemServerRequestProxy(HostMemServerRequestS2H);
+	MMURequestProxy *dmap = new MMURequestProxy(HostMMURequestS2H);
 	DmaManager *dma = new DmaManager(dmap);
-	MemServerIndication *hostMemServerIndication = new MemServerIndication(hostMemServerRequest, IfcNames_HostMemServerIndication);
-	MMUIndication *hostMMUIndication = new MMUIndication(dma, IfcNames_HostMMUIndication);
+	MemServerIndication hostMemServerIndication(hostMemServerRequest, HostMemServerIndicationH2S);
+	MMUIndication hostMMUIndication(dma, HostMMUIndicationH2S);
 
 	fprintf(stderr, "Main::allocating memory...\n");
 
-	device = new FlashRequestProxy(IfcNames_FlashRequest);
-	FlashIndication *deviceIndication = new FlashIndication(IfcNames_FlashIndication);
+	device = new FlashRequestProxy(FlashRequestS2H);
+	FlashIndication deviceIndication(FlashIndicationH2S);
 	
-	srcAlloc = portalAlloc(srcAlloc_sz);
-	dstAlloc = portalAlloc(dstAlloc_sz);
+	srcAlloc = portalAlloc(srcAlloc_sz, 1);
+	dstAlloc = portalAlloc(dstAlloc_sz, 1);
 	srcBuffer = (unsigned int *)portalMmap(srcAlloc, srcAlloc_sz);
 	dstBuffer = (unsigned int *)portalMmap(dstAlloc, dstAlloc_sz);
 
@@ -346,11 +348,11 @@ int main(int argc, const char **argv)
 
 	printf( "Done initializing hw interfaces\n" ); fflush(stdout);
 
-	portalExec_start();
+	//portalExec_start();
 	printf( "Done portalExec_start\n" ); fflush(stdout);
 
-	portalDCacheFlushInval(dstAlloc, dstAlloc_sz, dstBuffer);
-	portalDCacheFlushInval(srcAlloc, srcAlloc_sz, srcBuffer);
+	portalCacheFlush(dstAlloc, dstBuffer, dstAlloc_sz, 1);
+	portalCacheFlush(srcAlloc, srcBuffer, srcAlloc_sz, 1);
 	ref_dstAlloc = dma->reference(dstAlloc);
 	ref_srcAlloc = dma->reference(srcAlloc);
 
@@ -374,7 +376,7 @@ int main(int argc, const char **argv)
 
 
 	for (int t = 0; t < NUM_TAGS; t++) {
-		for ( int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
+		for ( unsigned int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
 			readBuffers[t][i] = 0;
 			writeBuffers[t][i] = 0;
 		}
@@ -432,7 +434,7 @@ int main(int argc, const char **argv)
 				//get free tag
 				int freeTag = waitIdleWriteBuffer();
 				//fill write memory
-				for (int w=0; w<PAGE_SIZE/sizeof(unsigned int); w++) {
+				for (unsigned int w=0; w<PAGE_SIZE/sizeof(unsigned int); w++) {
 					writeBuffers[freeTag][w] = hashAddrToData(bus, chip, blk, w);
 				}
 				//send request
@@ -485,7 +487,7 @@ int main(int argc, const char **argv)
 	fprintf(stderr, "LOG: finished reading from page! %f\n", timespec_diff_sec(start, now) );
 
 	for ( int t = 0; t < NUM_TAGS; t++ ) {
-		for ( int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
+		for ( unsigned int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
 			fprintf(stderr,  "%x %x %x\n", t, i, readBuffers[t][i] );
 		}
 	}

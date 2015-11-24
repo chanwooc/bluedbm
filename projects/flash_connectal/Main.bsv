@@ -79,8 +79,8 @@ endinterface
 typedef 128 DmaBurstBytes; 
 Integer dmaBurstBytes = valueOf(DmaBurstBytes);
 Integer dmaBurstWords = dmaBurstBytes/wordBytes; //128/16 = 8
-Integer dmaBurstsPerPage = (pageSizeUser+dmaBurstBytes-1)/dmaBurstBytes; //ceiling, 65
-Integer dmaBurstWordsLast = (pageSizeUser%dmaBurstBytes)/wordBytes; //num bursts in last dma; 2 bursts
+Integer dmaBurstsPerPage = 65;//(pageSizeUser+dmaBurstBytes-1)/dmaBurstBytes; //ceiling, 65
+Integer dmaBurstWordsLast = 2;//(pageSizeUser%dmaBurstBytes)/wordBytes; //num bursts in last dma; 2 bursts
 
 interface MainIfc;
 	interface FlashRequest request;
@@ -114,8 +114,8 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	`endif
 
 	//Create read/write engines with NUM_BUSES memservers
-	MemreadEngineV#(WordSz, 4, NUM_BUSES) re <- mkMemreadEngine;
-	MemwriteEngineV#(WordSz, 1, NUM_BUSES) we <- mkMemwriteEngine;
+	MemreadEngine#(WordSz, 4, NUM_BUSES) re <- mkMemreadEngine;
+	MemwriteEngine#(WordSz, 1, NUM_BUSES) we <- mkMemwriteEngine;
 	//MemwriteEngineV#(WordSz, 2, NUM_BUSES) we <- mkMemwriteEngineBuff(1024);
 
 	Vector#(NUM_BUSES, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));
