@@ -4,7 +4,7 @@ INTERFACES = FlashRequest FlashIndication
 
 NUMBER_OF_MASTERS=1
 PIN_TYPE=Top_Pins
-DATA_BUS_WIDTH=128
+PIN_TYPE_INCLUDE=TopPins
 
 #Note: for some reason, xbsv can't parase ControllerTypes.bsv properly. So a soft link in current directory is created
 BSVFILES = Main.bsv Top.bsv \
@@ -25,7 +25,8 @@ CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_8b10b_fmc1/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1.xci \
 	-C ../../xilinx/aurora_8b10b_fmc1/aurora_8b10b_fmc1_exdes.xdc \
-	-C ../../misc/bluedbm.xdc \
+	--constraint=../../misc/bluedbm.xdc \
+	--implconstraint=../../misc/bluedbm.xdc \
 
 AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1_stub.v
 prebuild:: $(AURORA_INTRA)

@@ -57,20 +57,14 @@ import Clocks :: *;
 
 // defined by user
 import Main::*;
-
 import AuroraCommon::*;
+import TopPins::*;
 
-typedef enum {FlashIndicationH2S, FlashRequestS2H, HostMemServerIndicationH2S, HostMemServerRequestS2H, HostMMURequestS2H, HostMMUIndicationH2S
+typedef enum {FlashIndicationH2S, FlashRequestS2H, IfcNames_MemServerIndicationH2S, IfcNames_MemServerRequestS2H, IfcNames_MMURequestS2H, IfcNames_MMUIndicationH2S
 	} IfcNames deriving (Eq,Bits);
 
-interface Top_Pins;
-	interface Aurora_Pins#(4) aurora_fmc1;
-	interface Aurora_Clock_Pins aurora_clk_fmc1;
-endinterface
 
-//typedef 128 DataBusWidth;
-
-module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop#(PhysAddrWidth,DataBusWidth,Top_Pins,NumberOfMasters))
+module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    provisos (Add#(0,128,DataBusWidth),Add#(1,0,NumberOfMasters));
 
 	
@@ -91,13 +85,13 @@ module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop#(PhysAddrWidth,
    let writeClients = hwmain.dmaWriteClient;
 
    
-   MMUIndicationProxy hostMMUIndicationProxy <- mkMMUIndicationProxy(HostMMUIndicationH2S);
+   MMUIndicationProxy hostMMUIndicationProxy <- mkMMUIndicationProxy(IfcNames_MMUIndicationH2S);
    MMU#(PhysAddrWidth) hostMMU <- mkMMU(0, True, hostMMUIndicationProxy.ifc);
-   MMURequestWrapper hostMMURequestWrapper <- mkMMURequestWrapper(HostMMURequestS2H, hostMMU.request);
+   MMURequestWrapper hostMMURequestWrapper <- mkMMURequestWrapper(IfcNames_MMURequestS2H, hostMMU.request);
 
-   MemServerIndicationProxy hostMemServerIndicationProxy <- mkMemServerIndicationProxy(HostMemServerIndicationH2S);
+   MemServerIndicationProxy hostMemServerIndicationProxy <- mkMemServerIndicationProxy(IfcNames_MemServerIndicationH2S);
    MemServer#(PhysAddrWidth,DataBusWidth,1) dma <- mkMemServer(readClients, writeClients, cons(hostMMU,nil), hostMemServerIndicationProxy.ifc);
-   MemServerRequestWrapper hostMemServerRequestWrapper <- mkMemServerRequestWrapper(HostMemServerRequestS2H, dma.request);
+   MemServerRequestWrapper hostMemServerRequestWrapper <- mkMemServerRequestWrapper(IfcNames_MemServerRequestS2H, dma.request);
 
    Vector#(6,StdPortal) portals;
    portals[0] = flashRequestWrapper.portalIfc;
