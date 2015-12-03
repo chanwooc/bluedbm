@@ -15,6 +15,7 @@ cd fpgamake;
 git pull;
 #git reset --hard 7cbe96eb18b72e99ff71cb34f361c85cfc375074
 #git reset --hard fc6a8bc9357c23a94a79cf1133cc878d2d77d3c6
+git reset --hard v15.06.1
 cd ../;
 
 
