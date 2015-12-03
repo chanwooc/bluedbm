@@ -25,8 +25,8 @@ CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_8b10b_fmc1/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1.xci \
 	-C ../../xilinx/aurora_8b10b_fmc1/aurora_8b10b_fmc1_exdes.xdc \
-	--constraint=../../misc/bluedbm.xdc \
-	--implconstraint=../../misc/bluedbm.xdc \
+	--constraint ../../misc/bluedbm.xdc \
+	--implconstraint ../../misc/bluedbm.xdc \
 
 AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1_stub.v
 prebuild:: $(AURORA_INTRA)
