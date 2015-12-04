@@ -73,9 +73,10 @@ set_false_path -from [get_clocks clkgen_pll_CLKOUT1_1] -to [get_clocks auroraI_u
 set_false_path -from [get_clocks auroraI_user_clk_i] -to [get_clocks clkgen_pll_CLKOUT1_1]
 
 set_false_path -from [get_clocks clockGen_pll_CLKOUT2_1] -to [clkgen_pll_CLKOUT1_1]
+set_false_path -from [get_clocks clkGen pll_CLKOUT1_1] -to [clockGen_pll_CLKOUT2_1]
 
 set_false_path -from [get_clocks clkgen_pll_CLKOUT1_1] -to [get_clocks GT_REFCLK1]
+set_false_path -from [get_clocks clkgen_pll_CLKOUT1_1] -to [get_clocks auroraI_user_clk_i]
 set_false_path -from [get_clocks clkgen_pll_CLKOUT1_1] -to [get_clocks auroraI_drp_clk_i]
 set_false_path -from [get_clocks clkgen_pll_CLKOUT1_1] -to [get_clocks auroraI_init_clk_i]
-set_false_path -from [get_clocks clkgen_pll_CLKOUT1_1] -to [get_clocks auroraI_user_clk_i]
 

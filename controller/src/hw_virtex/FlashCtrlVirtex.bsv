@@ -8,8 +8,8 @@ import Vector::*;
 
 //import ConnectalMemory::*;
 import MemTypes::*;
-import MemreadEngine::*;
-import MemwriteEngine::*;
+import MemReadEngine::*;
+import MemWriteEngine::*;
 import Pipe::*;
 
 import AuroraGearbox::*;

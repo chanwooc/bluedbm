@@ -2,13 +2,11 @@ CONNECTALDIR=../../tools/connectal/
 
 INTERFACES = FlashRequest FlashIndication
 
-NUMBER_OF_MASTERS=1
 PIN_TYPE=Top_Pins
 PIN_TYPE_INCLUDE=TopPins
 
-#Note: for some reason, xbsv can't parase ControllerTypes.bsv properly. So a soft link in current directory is created
-BSVFILES = Main.bsv Top.bsv \
-	../../xilinx/aurora_8b10b_fmc1/AuroraImportFmc1.bsv \
+BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
+	../../xilinx/aurora_8b10b_fmc1_new/AuroraImportFmc1.bsv \
 	../../src/lib/AuroraCommon.bsv \
 	../../controller/src/common/FlashBusModel.bsv \
 	../../controller/src/model_virtex/FlashCtrlModel.bsv \
@@ -19,12 +17,13 @@ CPPFILES=main.cpp
 CONNECTALFLAGS  = -D IMPORT_HOST_CLOCKS -D DataBusWidth=128 --clib rt
 CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
 CONNECTALFLAGS += -P mkConnectalTop
+CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
 
 ifeq ($(BOARD), vc707)
 CONNECTALFLAGS += \
-	--verilog ../../xilinx/aurora_8b10b_fmc1/ \
+	--verilog ../../xilinx/aurora_8b10b_fmc1_new/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1.xci \
-	-C ../../xilinx/aurora_8b10b_fmc1/aurora_8b10b_fmc1_exdes.xdc \
+	-C ../../xilinx/aurora_8b10b_fmc1_new/aurora_8b10b_fmc1_exdes.xdc \
 	--constraint ../../misc/bluedbm.xdc \
 	--implconstraint ../../misc/bluedbm.xdc \
 

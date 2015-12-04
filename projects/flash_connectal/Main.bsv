@@ -33,8 +33,8 @@ import List::*;
 
 import ConnectalMemory::*;
 import MemTypes::*;
-import MemreadEngine::*;
-import MemwriteEngine::*;
+import MemReadEngine::*;
+import MemWriteEngine::*;
 import Pipe::*;
 
 import Clocks :: *;
@@ -114,8 +114,8 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	`endif
 
 	//Create read/write engines with NUM_BUSES memservers
-	MemreadEngine#(WordSz, 4, NUM_BUSES) re <- mkMemreadEngine;
-	MemwriteEngine#(WordSz, 1, NUM_BUSES) we <- mkMemwriteEngine;
+	MemReadEngine#(WordSz, WordSz, 4, NUM_BUSES) re <- mkMemReadEngine;
+	MemWriteEngine#(WordSz, WordSz,  1, NUM_BUSES) we <- mkMemWriteEngine;
 	//MemwriteEngineV#(WordSz, 2, NUM_BUSES) we <- mkMemwriteEngineBuff(1024);
 
 	Vector#(NUM_BUSES, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));
@@ -261,12 +261,12 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 			let taggedRdata = dmaWriteBufOut[b].first;
 			let data = tpl_1(taggedRdata);
 			dmaWriteBufOut[b].deq;
-			we.dataPipes[b].enq(data);
+			we.writeServers[b].data.enq(data);
 		endrule
 
 		//dma response.get done; when enough has accumulated, send ack to sw
 		rule dmaWriterGetResponse;
-			let dummy <- we.writeServers[b].response.get;
+			let dummy <- we.writeServers[b].done.get;
 			let tagCnt = dmaReq2RespQ[b].first;
 			dmaReq2RespQ[b].deq;
 			$display("@%d Main.bsv: dma resp [%d] tag=%d", cycleCnt, tpl_2(tagCnt), tpl_1(tagCnt));
@@ -349,17 +349,17 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 			end
 		endrule
 
-		rule dmaReaderGetResponse;
-			let dummy <- re.readServers[b].response.get;
-		endrule
+		//rule dmaReaderGetResponse;
+		//	let dummy <- re.readServers[b].done;
+		//endrule
 
 		//forward data
 		FIFO#(Tuple2#(Bit#(128), TagT)) writeWordPipe <- mkFIFO();
 		rule pipeDmaRdData;
-			let d <- toGet(re.dataPipes[b]).get;
+			let d <- toGet(re.readServers[b].data).get;
 			let tag = dmaRdReq2RespQ[b].first;
 			if (dmaReadBurstCount[b] < fromInteger(pageWords)) begin
-				writeWordPipe.enq(tuple2(d, tag));
+				writeWordPipe.enq(tuple2(d.data, tag));
 				$display("Main.bsv: forwarded dma read data [%d]: tag=%d, data=%x", dmaReadBurstCount[b],
 								tag, d);
 			end

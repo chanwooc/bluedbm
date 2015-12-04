@@ -59,9 +59,8 @@ import Clocks :: *;
 import Main::*;
 import AuroraCommon::*;
 import TopPins::*;
-
-typedef enum {FlashIndicationH2S, FlashRequestS2H, IfcNames_MemServerIndicationH2S, IfcNames_MemServerRequestS2H, IfcNames_MMURequestS2H, IfcNames_MMUIndicationH2S
-	} IfcNames deriving (Eq,Bits);
+import IfcNames::*;
+import ConnectalConfig::*;
 
 
 module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
@@ -85,13 +84,13 @@ module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    let writeClients = hwmain.dmaWriteClient;
 
    
-   MMUIndicationProxy hostMMUIndicationProxy <- mkMMUIndicationProxy(IfcNames_MMUIndicationH2S);
+   MMUIndicationProxy hostMMUIndicationProxy <- mkMMUIndicationProxy(PlatformIfcNames_MMUIndicationH2S);
    MMU#(PhysAddrWidth) hostMMU <- mkMMU(0, True, hostMMUIndicationProxy.ifc);
-   MMURequestWrapper hostMMURequestWrapper <- mkMMURequestWrapper(IfcNames_MMURequestS2H, hostMMU.request);
+   MMURequestWrapper hostMMURequestWrapper <- mkMMURequestWrapper(PlatformIfcNames_MMURequestS2H, hostMMU.request);
 
-   MemServerIndicationProxy hostMemServerIndicationProxy <- mkMemServerIndicationProxy(IfcNames_MemServerIndicationH2S);
+   MemServerIndicationProxy hostMemServerIndicationProxy <- mkMemServerIndicationProxy(PlatformIfcNames_MemServerIndicationH2S);
    MemServer#(PhysAddrWidth,DataBusWidth,1) dma <- mkMemServer(readClients, writeClients, cons(hostMMU,nil), hostMemServerIndicationProxy.ifc);
-   MemServerRequestWrapper hostMemServerRequestWrapper <- mkMemServerRequestWrapper(IfcNames_MemServerRequestS2H, dma.request);
+   MemServerRequestWrapper hostMemServerRequestWrapper <- mkMemServerRequestWrapper(PlatformIfcNames_MemServerRequestS2H, dma.request);
 
    Vector#(6,StdPortal) portals;
    portals[0] = flashRequestWrapper.portalIfc;
@@ -105,7 +104,7 @@ module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    
    interface interrupt = getInterruptVector(portals);
    interface slave = ctrl_mux;
-   interface masters = dma.masters;
+//   interface masters = dma.masters;
 
 	interface Top_Pins pins;
 		interface Aurora_Pins aurora_fmc1 = hwmain.aurora_fmc1;
