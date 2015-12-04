@@ -6,8 +6,8 @@ cd tools;
 #new connectal
 git clone https://github.com/cambridgehackers/connectal.git connectal
 cd connectal;
+git pull;
 #git reset --hard 62a9af99ed464ee88c99292f661cc9f31a3a5371
-git reset --hard v15.07.3
 cd ../;
 
 git clone https://github.com/cambridgehackers/fpgamake.git
@@ -15,7 +15,6 @@ cd fpgamake;
 git pull;
 #git reset --hard 7cbe96eb18b72e99ff71cb34f361c85cfc375074
 #git reset --hard fc6a8bc9357c23a94a79cf1133cc878d2d77d3c6
-git reset --hard v15.06.1
 cd ../;
 
 
