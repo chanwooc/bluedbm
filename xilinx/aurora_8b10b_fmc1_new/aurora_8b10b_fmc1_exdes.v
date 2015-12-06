@@ -378,8 +378,11 @@ assign  dwe_in_lane3_i    =  1'b0;
         .pll_not_locked_out(pll_not_locked_i),
 	.tx_resetdone_out(tx_resetdone_i),
 	.rx_resetdone_out(rx_resetdone_i),
-        .init_clk_p(INIT_CLK_P),
-        .init_clk_n(INIT_CLK_N),
+//        .init_clk_p(INIT_CLK_P),
+//        .init_clk_n(INIT_CLK_N),
+		.init_clk_in(INIT_CLK_IN),
+//		.init_clk_p(INIT_CLK_IN),
+//		.init_clk_n(!INIT_CLK_IN),
         .init_clk_out (init_clk_i),
         .drpclk_in  (drpclk_i),
 .drpaddr_in  (daddr_in_i),
@@ -440,7 +443,7 @@ generate
      .AXI4_S_OP_TLAST(),
      .AXI4_S_IP_TREADY(tx_tready_i)
     );
-
+/*
     //Connect a frame generator to the TX User interface
     aurora_8b10b_fmc1_FRAME_GEN frame_gen_i
     (
@@ -455,6 +458,7 @@ generate
         .RESET(system_reset_i),
         .CHANNEL_UP(channel_up_r)
     );
+*/
     //_____________________________ RX AXI SHIM _______________________________
     aurora_8b10b_fmc1_AXI_TO_LL_EXDES #
     (
@@ -484,7 +488,7 @@ generate
      .RESET(system_reset_i),
      .CHANNEL_UP(channel_up_r)
      );
-
+/*
     aurora_8b10b_fmc1_FRAME_CHECK frame_check_i
     (
         // User Interface
@@ -497,7 +501,7 @@ generate
         .CHANNEL_UP(channel_up_r),
         .ERR_COUNT(err_count_i)
     );   
- 
+*/ 
  end //end USE_CORE_TRAFFIC=1 block
  else
  begin: no_traffic

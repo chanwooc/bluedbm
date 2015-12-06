@@ -97,8 +97,9 @@ input              power_down,
 input   [2:0]      loopback,
 output             tx_lock,
 
-input              init_clk_p,
-input              init_clk_n,
+//input              init_clk_p,
+//input              init_clk_n,
+input              init_clk_in,
 output             init_clk_out,
 output             tx_resetdone_out,
 output             rx_resetdone_out,
@@ -169,6 +170,7 @@ wire               gt_reset_i;
 wire               drpclk_i;
 
 //--- Instance of GT differential buffer ---------//
+/*
  IBUFDS_GTE2 IBUFDS_GTE2_CLK1
  (
  .I(gt_refclk1_p),
@@ -177,15 +179,16 @@ wire               drpclk_i;
  .O(gt_refclk1_i),
  .ODIV2()
  );
-
+*/
 
 assign drpclk_i = drpclk_in;
 
     // Instantiate a clock module for clock division.
     aurora_8b10b_fmc1_CLOCK_MODULE clock_module_i
     (
-        .INIT_CLK_P(init_clk_p),
-        .INIT_CLK_N(init_clk_n),
+		.INIT_CLK_IN(init_clk_in),
+        //.INIT_CLK_P(init_clk_p),
+        //.INIT_CLK_N(init_clk_n),
         .INIT_CLK_O(init_clk_i),
         .GT_CLK(tx_out_clk_i),
         .GT_CLK_LOCKED(tx_lock_i),

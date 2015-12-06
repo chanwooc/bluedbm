@@ -61,8 +61,9 @@
 (* core_generation_info = "aurora_8b10b_fmc1,aurora_8b10b_v11_0,{user_interface=AXI_4_Streaming,backchannel_mode=Sidebands,c_aurora_lanes=4,c_column_used=right,c_gt_clock_1=GTXQ5,c_gt_clock_2=None,c_gt_loc_1=X,c_gt_loc_10=X,c_gt_loc_11=X,c_gt_loc_12=X,c_gt_loc_13=X,c_gt_loc_14=X,c_gt_loc_15=X,c_gt_loc_16=X,c_gt_loc_17=X,c_gt_loc_18=X,c_gt_loc_19=X,c_gt_loc_2=X,c_gt_loc_20=X,c_gt_loc_21=1,c_gt_loc_22=2,c_gt_loc_23=3,c_gt_loc_24=4,c_gt_loc_25=X,c_gt_loc_26=X,c_gt_loc_27=X,c_gt_loc_28=X,c_gt_loc_29=X,c_gt_loc_3=X,c_gt_loc_30=X,c_gt_loc_31=X,c_gt_loc_32=X,c_gt_loc_33=X,c_gt_loc_34=X,c_gt_loc_35=X,c_gt_loc_36=X,c_gt_loc_37=X,c_gt_loc_38=X,c_gt_loc_39=X,c_gt_loc_4=X,c_gt_loc_40=X,c_gt_loc_41=X,c_gt_loc_42=X,c_gt_loc_43=X,c_gt_loc_44=X,c_gt_loc_45=X,c_gt_loc_46=X,c_gt_loc_47=X,c_gt_loc_48=X,c_gt_loc_5=X,c_gt_loc_6=X,c_gt_loc_7=X,c_gt_loc_8=X,c_gt_loc_9=X,c_lane_width=4,c_line_rate=44000,c_nfc=false,c_nfc_mode=IMM,c_refclk_frequency=275000,c_simplex=false,c_simplex_mode=TX,c_stream=true,c_ufc=false,flow_mode=None,interface_mode=Streaming,dataflow_config=Duplex}" *)
 module aurora_8b10b_fmc1_CLOCK_MODULE
 (
-    INIT_CLK_P,
-    INIT_CLK_N,
+	INIT_CLK_IN,
+    //INIT_CLK_P,
+    //INIT_CLK_N,
     INIT_CLK_O,
     GT_CLK,
     GT_CLK_LOCKED,
@@ -72,8 +73,9 @@ module aurora_8b10b_fmc1_CLOCK_MODULE
 );
 
 //***********************************Port Declarations*******************************
-    input              INIT_CLK_P;
-    input              INIT_CLK_N;
+	input INIT_CLK_IN;
+//    input              INIT_CLK_P;
+//    input              INIT_CLK_N;
     output             INIT_CLK_O;
     input       GT_CLK;
     input       GT_CLK_LOCKED;
@@ -97,13 +99,14 @@ module aurora_8b10b_fmc1_CLOCK_MODULE
   assign PLL_NOT_LOCKED  =   !GT_CLK_LOCKED;
 
   // Assign an IBUFDS to INIT_CLK
+/*
   IBUFDS init_clk_ibufg_i
   (
    .I(INIT_CLK_P),
    .IB(INIT_CLK_N),
    .O(INIT_CLK_I)
   );
-
+*/
   BUFG init_clk_buf_i
     (
         .I(INIT_CLK_I),
