@@ -62,7 +62,6 @@ import TopPins::*;
 import IfcNames::*;
 import ConnectalConfig::*;
 
-
 module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    provisos (Add#(0,128,DataBusWidth),Add#(1,0,NumberOfMasters));
 

@@ -85,8 +85,8 @@ output             channel_up,
 
 
     // Clock Compensation Control Interface
-input              warn_cc,
-input              do_cc,
+//input              warn_cc,
+//input              do_cc,
 
     // System Interface
 output              user_clk_out,
@@ -264,8 +264,8 @@ aurora_8b10b_fmc1 aurora_8b10b_fmc1_i
 
 
         // Clock Compensation Control Interface
-       .warn_cc                      (warn_cc),
-       .do_cc                        (do_cc),
+       //.warn_cc                      (warn_cc),
+       //.do_cc                        (do_cc),
 
         // System Interface
        .user_clk                     (user_clk_i),

@@ -101,8 +101,8 @@
 
 `timescale 1ps / 1ps
 (* DowngradeIPIdentifiedWarnings="yes" *)
-module aurora_8b10b_fmc1_cdc_sync_exdes
-   # (
+module aurora_8b10b_fmc1_cdc_sync_exdes # 
+	(
        parameter [1:0] c_cdc_type      = 1,   // 0 Pulse synchronizer, 1 level synchronizer 2 level synchronizer with ACK 
        parameter [0:0] c_flop_input    = 0,   // 1 Adds one flop stage to the input prmry_in signal
        parameter [0:0] c_reset_state   = 0,   // 1 Reset needed for sync flops 

@@ -73,9 +73,9 @@ output  [0:3]      txp,
 output  [0:3]      txn,
 
     // GT Reference Clock Interface
- 
-input              gt_refclk1_p,
-input              gt_refclk1_n,
+	input			gt_refclk1_i, 
+//input              gt_refclk1_p,
+//input              gt_refclk1_n,
  
 
     // Error Detection Interface
@@ -100,7 +100,7 @@ output             tx_lock,
 //input              init_clk_p,
 //input              init_clk_n,
 input              init_clk_in,
-output             init_clk_out,
+//output             init_clk_out,
 output             tx_resetdone_out,
 output             rx_resetdone_out,
 output             link_reset_out,
@@ -154,7 +154,7 @@ wire                      gt_qpllrefclk_quad6_i;
 //____________________________COMMON PORTS ;_______________________________}
 //------------------}
 
-wire               gt_refclk1_i;
+//wire               gt_refclk1_i;
 wire               tx_out_clk_i;
 wire               user_clk_i;
 wire               sync_clk_i;
@@ -167,7 +167,7 @@ wire               rx_resetdone_i;
 wire               link_reset_i;
 wire               system_reset_i;
 wire               gt_reset_i;
-wire               drpclk_i;
+//wire               drpclk_i;
 
 //--- Instance of GT differential buffer ---------//
 /*
@@ -181,7 +181,6 @@ wire               drpclk_i;
  );
 */
 
-assign drpclk_i = drpclk_in;
 
     // Instantiate a clock module for clock division.
     aurora_8b10b_fmc1_CLOCK_MODULE clock_module_i
@@ -198,8 +197,6 @@ assign drpclk_i = drpclk_in;
     );
 
   //  outputs
-  assign init_clk_out          =  init_clk_i;
- 
   assign user_clk_out          =  user_clk_i;
   assign pll_not_locked_out    =  pll_not_locked_i;
   assign tx_lock               =  tx_lock_i;
@@ -288,7 +285,7 @@ aurora_8b10b_fmc1 aurora_8b10b_fmc1_i
        .tx_resetdone_out             (tx_resetdone_i),
        .rx_resetdone_out             (rx_resetdone_i),
        .link_reset_out               (link_reset_i),
-       .drpclk_in                    (drpclk_i),
+       .drpclk_in                    (drpclk_in),
        .drpaddr_in                   (drpaddr_in),
        .drpen_in                     (drpen_in),
        .drpdi_in                     (drpdi_in),

@@ -4,6 +4,7 @@ INTERFACES = FlashRequest FlashIndication
 
 PIN_TYPE=Top_Pins
 PIN_TYPE_INCLUDE=TopPins
+NUMBER_OF_MASTERS=1
 
 BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 	../../xilinx/aurora_8b10b_fmc1_new/AuroraImportFmc1.bsv \
@@ -15,11 +16,11 @@ BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 CPPFILES=main.cpp
 
 CONNECTALFLAGS  = -D IMPORT_HOST_CLOCKS -D DataBusWidth=128 --clib rt
-CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
-CONNECTALFLAGS += -P mkConnectalTop
+#CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
+#CONNECTALFLAGS += -P mkConnectalTop
 CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
 
-ifeq ($(BOARD), vc707)
+ifneq ($(BOARD), bluesim)
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_8b10b_fmc1_new/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1.xci \

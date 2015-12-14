@@ -138,7 +138,6 @@ output             CHANNEL_UP;
     // Clocks
 //input              GTXQ5_P;
 //input              GTXQ5_N;
-
     input INIT_CLK_IN;
     input GTX_CLK;
 
@@ -148,6 +147,7 @@ output             CHANNEL_UP;
 
 	wire RESET;
 	assign RESET = ~RESET_N;
+	wire DRP_CLK_IN;
 	assign DRP_CLK_IN = INIT_CLK_IN;
 	wire GT_RESET_IN;
 	assign GT_RESET_IN = ~GT_RESET_N;
@@ -210,7 +210,8 @@ wire               tx_lock_i;
 (* mark_debug = "true" *)wire               tx_resetdone_i;
 (* mark_debug = "true" *)wire               tx_resetdone_ila;
 (* mark_debug = "true" *)wire               rx_resetdone_i;
-(* KEEP = "TRUE" *) wire               init_clk_i;
+//(* KEEP = "TRUE" *) wire               init_clk_i;
+// assign init_clk_i = INIT_CLK_IN;
 wire    [8:0]     daddr_in_i;
 wire              dclk_in_i;
 wire              den_in_i;
@@ -276,7 +277,7 @@ wire               tx_tready_i;
     // RX AXI PDU I/F wires
 wire    [0:127]    rx_data_i;
 wire               rx_tvalid_i;
-   wire  drpclk_i;
+//   wire  drpclk_i;
    //SLACK Registers
    reg    [0:3]      lane_up_r;
    reg    [0:3]      lane_up_r2;
@@ -285,9 +286,9 @@ wire               rx_tvalid_i;
  
 
 
-  BUFG drpclk_bufg
-   (.O   (drpclk_i),
-    .I   (DRP_CLK_IN));
+//  BUFG drpclk_bufg
+//   (.O   (drpclk_i),
+//    .I   (DRP_CLK_IN));
 
   //SLACK registers
   always @ (posedge user_clk_i)
@@ -356,9 +357,9 @@ assign  dwe_in_lane3_i    =  1'b0;
         .txp(TXP),
         .txn(TXN),
         // GT Reference Clock Interface
- 
-        .gt_refclk1_p(GTXQ5_P),
-        .gt_refclk1_n(GTXQ5_N),
+		.gt_refclk1_i(GTX_CLK),
+        //.gt_refclk1_p(GTXQ5_P),
+        //.gt_refclk1_n(GTXQ5_N),
         // Error Detection Interface
         .hard_err(hard_err_i),
         .soft_err(soft_err_i),
@@ -381,10 +382,8 @@ assign  dwe_in_lane3_i    =  1'b0;
 //        .init_clk_p(INIT_CLK_P),
 //        .init_clk_n(INIT_CLK_N),
 		.init_clk_in(INIT_CLK_IN),
-//		.init_clk_p(INIT_CLK_IN),
-//		.init_clk_n(!INIT_CLK_IN),
-        .init_clk_out (init_clk_i),
-        .drpclk_in  (drpclk_i),
+		.drpclk_in  (DRP_CLK_IN),
+//        .init_clk_out (init_clk_i),
 .drpaddr_in  (daddr_in_i),
 .drpen_in    (den_in_i),
 .drpdi_in     (di_in_i),
@@ -443,6 +442,7 @@ generate
      .AXI4_S_OP_TLAST(),
      .AXI4_S_IP_TREADY(tx_tready_i)
     );
+
 /*
     //Connect a frame generator to the TX User interface
     aurora_8b10b_fmc1_FRAME_GEN frame_gen_i
@@ -501,7 +501,7 @@ generate
         .CHANNEL_UP(channel_up_r),
         .ERR_COUNT(err_count_i)
     );   
-*/ 
+ */
  end //end USE_CORE_TRAFFIC=1 block
  else
  begin: no_traffic
@@ -554,7 +554,7 @@ end
        .prmry_rst_n     (1'b1              ),
        .prmry_in        (channel_up_r      ),
        .prmry_vect_in   (2'd0              ),
-       .scndry_aclk     (init_clk_i        ),
+       .scndry_aclk     (INIT_CLK_IN        ),
        .scndry_rst_n    (1'b1              ),
        .prmry_ack       (                  ),
        .scndry_out      (channel_up_r_vio  ),
@@ -575,7 +575,7 @@ end
         .prmry_rst_n     (1'b1              ),
         .prmry_in        (lane_up_i_i_r     ),
         .prmry_vect_in   (2'd0              ),
-        .scndry_aclk     (init_clk_i        ),
+        .scndry_aclk     (INIT_CLK_IN        ),
         .scndry_rst_n    (1'b1              ),
         .prmry_ack       (                  ),
         .scndry_out      (lane_up_i_i_vio   ),
@@ -596,7 +596,7 @@ end
           .prmry_rst_n     (1'b1              ),
           .prmry_in        (tx_lock_i_i       ),
           .prmry_vect_in   (2'd0              ),
-          .scndry_aclk     (init_clk_i        ),
+          .scndry_aclk     (INIT_CLK_IN        ),
           .scndry_rst_n    (1'b1              ),
           .prmry_ack       (                  ),
           .scndry_out      (tx_lock_i_i_vio   ),
@@ -613,7 +613,7 @@ end
           .c_mtbf_stages   (3              )
         )system_reset_vio_cdc_sync_exdes
         (
-          .prmry_aclk      (init_clk_i        ),
+          .prmry_aclk      (INIT_CLK_IN        ),
           .prmry_rst_n     (1'b1              ),
           .prmry_in        (sysreset_vio_i    ),
           .prmry_vect_in   (2'd0              ),
@@ -629,7 +629,7 @@ end
   //-----------------------------------------------------------------
 vio_7series i_vio 
 (
-  .clk(init_clk_i), // input CLK
+  .clk(INIT_CLK_IN), // input CLK
   .probe_in0(channel_up_r_vio), // input [0 : 0] PROBE_IN0
   .probe_in1(lane_up_i_i_vio), // input [0 : 0] PROBE_IN1
   .probe_in2(tx_lock_i_i_vio), // input [0 : 0] PROBE_IN2
@@ -652,7 +652,7 @@ vio_7series i_vio
         .c_mtbf_stages  (3              )
       )tx_resetdone_ila_cdc_sync_exdes 
       (
-        .prmry_aclk      (init_clk_i        ),
+        .prmry_aclk      (INIT_CLK_IN        ),
         .prmry_rst_n     (1'b1              ),
         .prmry_in        (tx_resetdone_i    ),
         .prmry_vect_in   (2'd0              ),
@@ -672,7 +672,7 @@ vio_7series i_vio
         .c_mtbf_stages   (3              )
       )link_reset_ila_cdc_sync_exdes 
       (
-        .prmry_aclk      (init_clk_i        ),
+        .prmry_aclk      (INIT_CLK_IN        ),
         .prmry_rst_n     (1'b1              ),
         .prmry_in        (link_reset_i      ),
         .prmry_vect_in   (2'd0              ),
@@ -692,7 +692,7 @@ vio_7series i_vio
         .c_mtbf_stages   (3              )
       )pll_not_locked_ila_cdc_sync_exdes 
       (
-        .prmry_aclk      (init_clk_i        ),
+        .prmry_aclk      (INIT_CLK_IN        ),
         .prmry_rst_n     (1'b1              ),
         .prmry_in        (pll_not_locked_i  ),
         .prmry_vect_in   (2'd0              ),
@@ -713,7 +713,7 @@ vio_7series i_vio
         .c_mtbf_stages   (3              )
       )tx_lock_i_ila_cdc_sync_exdes 
       (
-        .prmry_aclk      (init_clk_i        ),
+        .prmry_aclk      (INIT_CLK_IN        ),
         .prmry_rst_n     (1'b1              ),
         .prmry_in        (tx_lock_i_i       ),
         .prmry_vect_in   (2'd0              ),

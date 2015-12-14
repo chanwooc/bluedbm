@@ -331,17 +331,22 @@ int main(int argc, const char **argv)
 	//DmaManager *dma = new DmaManager(dmap);
 	//MemServerIndication hostMemServerIndication(hostMemServerRequest, HostMemServerIndicationH2S);
 	//MMUIndication hostMMUIndication(dma, HostMMUIndicationH2S);
-    DmaManager *dma = platformInit();
-
-	fprintf(stderr, "Main::allocating memory...\n");
+	fprintf(stderr, "Initializing DMA...\n");
 
 	device = new FlashRequestProxy(FlashRequestS2H);
 	FlashIndication deviceIndication(FlashIndicationH2S);
+    DmaManager *dma = platformInit();
+
+	fprintf(stderr, "Main::allocating memory...\n");
 	
 	srcAlloc = portalAlloc(srcAlloc_sz, 1);
+	fprintf(stderr, "Main::allocating memory..1\n");
 	dstAlloc = portalAlloc(dstAlloc_sz, 1);
+	fprintf(stderr, "Main::allocating memory..2\n");
 	srcBuffer = (unsigned int *)portalMmap(srcAlloc, srcAlloc_sz);
+	fprintf(stderr, "Main::allocating memory..3\n");
 	dstBuffer = (unsigned int *)portalMmap(dstAlloc, dstAlloc_sz);
+	fprintf(stderr, "Main::allocating memory..4\n");
 
 	fprintf(stderr, "dstAlloc = %x\n", dstAlloc); 
 	fprintf(stderr, "srcAlloc = %x\n", srcAlloc); 

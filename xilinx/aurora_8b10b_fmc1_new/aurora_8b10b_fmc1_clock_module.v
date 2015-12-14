@@ -82,8 +82,7 @@ module aurora_8b10b_fmc1_CLOCK_MODULE
     output      USER_CLK;
     output      SYNC_CLK;
     output      PLL_NOT_LOCKED;
-    wire INIT_CLK_I;
-    
+
 //*********************************Main Body of Code**********************************
 
 
@@ -106,12 +105,13 @@ module aurora_8b10b_fmc1_CLOCK_MODULE
    .IB(INIT_CLK_N),
    .O(INIT_CLK_I)
   );
-*/
+
   BUFG init_clk_buf_i
     (
         .I(INIT_CLK_I),
         .O(INIT_CLK_O)
     );
-
+*/
+	assign INIT_CLK_O = INIT_CLK_IN;
 
 endmodule

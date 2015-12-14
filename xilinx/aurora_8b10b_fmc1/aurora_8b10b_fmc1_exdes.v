@@ -149,7 +149,7 @@ input GTX_CLK;
 	assign USER_RST_N = !system_reset_i;
 	
 	assign tx_src_rdy_n_i = !tx_en;
-	assign tx_rdy = (!tx_dst_rdy_n_i) && channel_up_i && !system_reset_i && (!do_cc_i);
+	assign tx_rdy = (!tx_dst_rdy_n_i) && channel_up_i && !system_reset_i; //&& (!do_cc_i);
 	assign tx_d_i = TX_DATA;
 	
 	assign RX_DATA = RX_DATA_delay;
@@ -189,8 +189,8 @@ wire               rx_src_rdy_n_i;
 (* mark_debug = "true" *)reg                channel_up_r;
 (* mark_debug = "true" *)wire    [0:3]      lane_up_i;
     // Clock Compensation Control Interface
-wire               warn_cc_i;
-wire               do_cc_i;
+//wire               warn_cc_i;
+//wire               do_cc_i;
     // System Interface
 (* mark_debug = "true" *)wire               pll_not_locked_i;
 wire               user_clk_i;
@@ -345,8 +345,8 @@ assign  dwe_in_lane3_i    =  1'b0;
         .channel_up(channel_up_i),
         .lane_up(lane_up_i),
         // Clock Compensation Control Interface
-        .warn_cc(warn_cc_i),
-        .do_cc(do_cc_i),
+        //.warn_cc(warn_cc_i),
+        //.do_cc(do_cc_i),
         // System Interface
         .user_clk_out(user_clk_i),
         .reset(reset_i),
@@ -388,7 +388,7 @@ assign  dwe_in_lane3_i    =  1'b0;
         .link_reset_out(link_reset_i)
     );
 
-
+/*
     aurora_8b10b_fmc1_STANDARD_CC_MODULE standard_cc_module_i
     (
         .RESET(rst_cc_module_i),
@@ -399,7 +399,7 @@ assign  dwe_in_lane3_i    =  1'b0;
         .PLL_NOT_LOCKED(pll_not_locked_i),
         .USER_CLK(user_clk_i)
     );
-
+*/
 generate
  if (USE_CORE_TRAFFIC==1)
  begin : traffic
