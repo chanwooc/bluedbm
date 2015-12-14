@@ -22,7 +22,9 @@ import ConnectalClocks::*;
 typedef 2 AuroraExtCount;
 //typedef 4 AuroraExtQuad;
 
+`ifndef BSIM
 (* always_enabled, always_ready *)
+`endif
 interface Aurora_Clock_Pins;
 	//(* prefix = "", result = "" *)
 	method Action gtx_clk_p(Bit#(1) v);
@@ -87,7 +89,9 @@ interface AuroraControllerIfc#(numeric type width);
 	method ActionValue#(Bit#(width)) receive();
 endinterface
 
+`ifndef BSIM
 (* always_enabled, always_ready *)
+`endif
 interface Aurora_Pins#(numeric type lanes);
 	(* prefix = "", result = "RXN" *)
 	method Action rxn_in(Bit#(lanes) rxn_i);

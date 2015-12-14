@@ -17,16 +17,26 @@ CPPFILES=main.cpp
 
 CONNECTALFLAGS  = -D IMPORT_HOST_CLOCKS -D DataBusWidth=128 --clib rt
 #CONNECTALFLAGS += -P mkPcieEndpointX7 -P mkMemMasterEngine -P mkMemSlaveEngineSynth -P mkPcieTracer
-#CONNECTALFLAGS += -P mkConnectalTop
+CONNECTALFLAGS += -P mkConnectalTop
 CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
+
+ifeq ($(BOARD), bluesim)
+CONNECTALFLAGS += -D BSIM
+endif
+
+ifeq ($(BOARD), vc707)
+BLUEDBM_XDC = ../../misc/bluedbm.xdc
+else
+BLUEDBM_XDC = ../../misc/bluedbm_g2.xdc
+endif
 
 ifneq ($(BOARD), bluesim)
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_8b10b_fmc1_new/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1.xci \
 	-C ../../xilinx/aurora_8b10b_fmc1_new/aurora_8b10b_fmc1_exdes.xdc \
-	--constraint ../../misc/bluedbm.xdc \
-	--implconstraint ../../misc/bluedbm.xdc \
+	--constraint $(BLUEDBM_XDC) \
+	--implconstraint $(BLUEDBM_XDC) \
 
 AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_fmc1/aurora_8b10b_fmc1_stub.v
 prebuild:: $(AURORA_INTRA)

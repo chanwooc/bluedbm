@@ -151,7 +151,7 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	// Reads from Flash (DMA Write)
 	//--------------------------------------------
 
-	rule doEnqReadFromFlash;
+	rule doEnqReadFromFlash (started); // started added
 		if (delayReg==0) begin
 			let taggedRdata <- flashCtrl.user.readWord();
 			debugReadCnt <= debugReadCnt + 1;
@@ -308,7 +308,7 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	Vector#(NUM_BUSES, Reg#(Bit#(32))) dmaRdReqCnts <- replicateM(mkReg(0));
 
 	//Handle write data requests from controller
-	rule handleWriteDataRequestFromFlash;
+	rule handleWriteDataRequestFromFlash (started); // started
 		TagT tag <- flashCtrl.user.writeDataReq();
 		//check which bus it's from
 		let bus = tag2busTable[tag];
@@ -444,8 +444,8 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	endrule
 
 
-
-	Vector#(1, MemWriteClient#(WordSz)) dmaWriteClientVec;
+	
+	Vector#(1, MemWriteClient#(WordSz)) dmaWriteClientVec; // = vec(we.dmaClient); BuildVector
 	Vector#(1, MemReadClient#(WordSz)) dmaReadClientVec;
 	dmaWriteClientVec[0] = we.dmaClient;
 	dmaReadClientVec[0] = re.dmaClient;
