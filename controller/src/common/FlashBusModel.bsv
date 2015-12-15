@@ -93,7 +93,7 @@ module mkFlashBusModel(FlashBusModelIfc);
 
 	
 	//enq commands to each chip (emulated sb)
-	Vector#(ChipsPerBus, FIFO#(FlashCmd)) flashChipCmdQs <- replicateM(mkSizedFIFO(16));
+	Vector#(ChipsPerBus, FIFO#(FlashCmd)) flashChipCmdQs <- replicateM(mkSizedFIFO(64));
 	FIFO#(Tuple2#(Bit#(WordSz), TagT)) busReadQ <- mkFIFO();
 	Reg#(Bool) busInUse <- mkReg(False);
 	Reg#(ChipT) busReservedChipIdx <- mkReg(0);

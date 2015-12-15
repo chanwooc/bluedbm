@@ -32,6 +32,7 @@ import Vector::*;
 import List::*;
 
 import ConnectalMemory::*;
+import ConnectalConfig::*;
 import MemTypes::*;
 import MemReadEngine::*;
 import MemWriteEngine::*;
@@ -84,8 +85,8 @@ Integer dmaBurstWordsLast = 2;//(pageSizeUser%dmaBurstBytes)/wordBytes; //num bu
 
 interface MainIfc;
 	interface FlashRequest request;
-	interface Vector#(1, MemWriteClient#(WordSz)) dmaWriteClient;
-	interface Vector#(1, MemReadClient#(WordSz)) dmaReadClient;
+	interface Vector#(1, MemWriteClient#(DataBusWidth)) dmaWriteClient;
+	interface Vector#(1, MemReadClient#(DataBusWidth)) dmaReadClient;
 	interface Aurora_Pins#(4) aurora_fmc1;
 	interface Aurora_Clock_Pins aurora_clk_fmc1;
 endinterface
@@ -151,7 +152,7 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	// Reads from Flash (DMA Write)
 	//--------------------------------------------
 
-	rule doEnqReadFromFlash (started); // started added
+	rule doEnqReadFromFlash ;//(started); // started added
 		if (delayReg==0) begin
 			let taggedRdata <- flashCtrl.user.readWord();
 			debugReadCnt <= debugReadCnt + 1;
@@ -173,7 +174,7 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 		let data = tpl_1(taggedRdata);
 		BusT bus = tag2busTable[tag];
 		dmaWriteBuf[bus].enq(taggedRdata);
-		$display("@%d Main.bsv: rdata tag=%d, bus=%d, data[%d]=%x", cycleCnt, tag, bus, dmaWBurstCnts[bus], data);
+		$display("@%d Main.bsv: rdata tag=%d, bus=%d, data[%d,%d]=%x", cycleCnt, tag, bus,dmaWBurstPerPageCnts[bus], dmaWBurstCnts[bus], data);
 	endrule
 
 	for (Integer b=0; b<valueOf(NUM_BUSES); b=b+1) begin
@@ -209,6 +210,7 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 				end
 				dmaWBurstCnts[b] <= dmaWBurstCnts[b] + 1;
 			end
+		$display("@%d Main.bs2: rdata tag=%d, bus=%d, data[%d,%d]", cycleCnt, tag, b,dmaWBurstPerPageCnts[b], dmaWBurstCnts[b]);
 		endrule
 
 		rule doDmaPad if (padCnt>0);
@@ -308,7 +310,7 @@ module mkMain#(FlashIndication indication, Clock clk250, Reset rst250)(MainIfc);
 	Vector#(NUM_BUSES, Reg#(Bit#(32))) dmaRdReqCnts <- replicateM(mkReg(0));
 
 	//Handle write data requests from controller
-	rule handleWriteDataRequestFromFlash (started); // started
+	rule handleWriteDataRequestFromFlash ; // (started); // started
 		TagT tag <- flashCtrl.user.writeDataReq();
 		//check which bus it's from
 		let bus = tag2busTable[tag];

@@ -51,9 +51,9 @@ module mkFlashCtrlModel#(
 	Vector#(NUM_BUSES, FlashBusModelIfc) flashBuses <- replicateM(mkFlashBusModel());
 
 	RegFile#(TagT, FlashCmd) tagTable <- mkRegFileFull();
-	FIFO#(Tuple2#(Bit#(WordSz), TagT)) rdDataQ <- mkSizedFIFO(16); //TODO size?
-	FIFO#(TagT) wrDataReqQ <- mkSizedFIFO(16);
-	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkSizedFIFO(16);
+	FIFO#(Tuple2#(Bit#(WordSz), TagT)) rdDataQ <- mkSizedFIFO(64); //TODO size?
+	FIFO#(TagT) wrDataReqQ <- mkSizedFIFO(64);
+	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkSizedFIFO(64);
 	
 	//GTX-GTP Aurora. Unused in model
 	AuroraIfc auroraIntra <- mkAuroraIntra(gtx_clk_p, gtx_clk_n, clk250);

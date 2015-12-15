@@ -62,6 +62,7 @@ import TopPins::*;
 import IfcNames::*;
 import ConnectalConfig::*;
 
+//(* synthesize *)
 module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    provisos (Add#(0,128,DataBusWidth),Add#(1,0,NumberOfMasters));
 
@@ -82,7 +83,7 @@ module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    let readClients = hwmain.dmaReadClient;
    let writeClients = hwmain.dmaWriteClient;
 
-   
+  /* 
    MMUIndicationProxy hostMMUIndicationProxy <- mkMMUIndicationProxy(PlatformIfcNames_MMUIndicationH2S);
    MMU#(PhysAddrWidth) hostMMU <- mkMMU(0, True, hostMMUIndicationProxy.ifc);
    MMURequestWrapper hostMMURequestWrapper <- mkMMURequestWrapper(PlatformIfcNames_MMURequestS2H, hostMMU.request);
@@ -98,12 +99,24 @@ module mkConnectalTop#(Clock clk250, Reset rst250) (ConnectalTop)
    portals[3] = hostMemServerIndicationProxy.portalIfc; 
    portals[4] = hostMMURequestWrapper.portalIfc;
    portals[5] = hostMMUIndicationProxy.portalIfc;
+   */
    
+   Vector#(2,StdPortal) portals;
+   portals[0] = flashRequestWrapper.portalIfc;
+   portals[1] = flashIndicationProxy.portalIfc; 
+
    let ctrl_mux <- mkSlaveMux(portals);
    
+//   interface masters = dma.masters;
+
+	Vector#(NumWriteClients,MemWriteClient#(DataBusWidth)) nullWriters = replicate(null_mem_write_client());
+	Vector#(NumReadClients,MemReadClient#(DataBusWidth)) nullReaders = replicate(null_mem_read_client());
+
+
+	interface readers = take(append(readClients, nullReaders));
+	interface writers = take(append(writeClients, nullWriters));
    interface interrupt = getInterruptVector(portals);
    interface slave = ctrl_mux;
-//   interface masters = dma.masters;
 
 	interface Top_Pins pins;
 		interface Aurora_Pins aurora_fmc1 = hwmain.aurora_fmc1;

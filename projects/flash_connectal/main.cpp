@@ -19,8 +19,8 @@
 #include "FlashRequest.h"
 
 #define BLOCKS_PER_CHIP 2
-#define CHIPS_PER_BUS 8
-#define NUM_BUSES 8
+#define CHIPS_PER_BUS 2 // 8
+#define NUM_BUSES 4 // 8
 
 #define PAGE_SIZE (8192*2)
 #define PAGE_SIZE_VALID (8224)
@@ -374,9 +374,9 @@ int main(int argc, const char **argv)
 		writeBuffers[t] = srcBuffer + byteOffset/sizeof(unsigned int);
 	}
 	
-	for (int blk=0; blk<BLOCKS_PER_CHIP; blk++) {
-		for (int c=0; c<CHIPS_PER_BUS; c++) {
-			for (int bus=0; bus< CHIPS_PER_BUS; bus++) {
+	for (int blk=0; blk < BLOCKS_PER_CHIP; blk++) {
+		for (int c=0; c < CHIPS_PER_BUS; c++) {
+			for (int bus=0; bus< NUM_BUSES; bus++) {
 				flashStatus[bus][c][blk] = UNINIT;
 			}
 		}
