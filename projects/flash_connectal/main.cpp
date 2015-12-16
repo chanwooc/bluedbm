@@ -19,7 +19,7 @@
 #include "FlashRequest.h"
 
 #define BLOCKS_PER_CHIP 2
-#define CHIPS_PER_BUS 2 // 8
+#define CHIPS_PER_BUS 4 // 8
 #define NUM_BUSES 4 // 8
 
 #define PAGE_SIZE (8192*2)
