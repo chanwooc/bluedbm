@@ -461,9 +461,9 @@ int main(int argc, const char **argv)
 	//write pages
 	//FIXME: in old xbsv, simulatneous DMA reads using multiple readers cause kernel panic
 	//Issue each bus separately for now
-	for (int bus = 0; bus < NUM_BUSES; bus++){
 	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+			for (int bus = 0; bus < NUM_BUSES; bus++){
 				int page = MYPAGE;
 				//get free tag
 				int freeTag = waitIdleWriteBuffer();
@@ -471,7 +471,6 @@ int main(int argc, const char **argv)
 				for (unsigned int w=0; w<FPAGE_SIZE/sizeof(unsigned int); w++) {
 					writeBuffers[freeTag][w] = hashAddrToData(bus, chip, blk, w);
 				}
-				//usleep(3000);
 				//send request
 				writePage(bus, chip, blk, page, freeTag);
 			}
@@ -493,12 +492,13 @@ int main(int argc, const char **argv)
 			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
 					int page = MYPAGE;
 					readPage(bus, chip, blk, page, waitIdleReadBuffer());
-				}
 			}
-			while (true) {
-				usleep(100);
-				if ( getNumReadsInFlight() == 0 ) break;
-			}
+		}
+		
+		while (true) {
+			usleep(100);
+			if ( getNumReadsInFlight() == 0 ) break;
+		}
 		}
 	}
 	
