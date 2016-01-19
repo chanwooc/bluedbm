@@ -6,8 +6,8 @@ PIN_TYPE=Top_Pins
 PIN_TYPE_INCLUDE=TopPins
 
 # specific for ZYNQ
-#NUMBER_OF_MASTERS=4
-#PLATFORM_NUMBER_OF_MASTERS=4
+NUMBER_OF_MASTERS=4
+PLATFORM_NUMBER_OF_MASTERS=4
 
 BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 	../../xilinx/aurora_8b10b_zynq/AuroraImportZynq.bsv \
@@ -19,6 +19,7 @@ BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 CPPFILES=main.cpp
 
 CONNECTALFLAGS  = -D DataBusWidth=64
+CONNECTALFLAGS  = -D NumReadClients=8 -D NumWriteClients=8
 CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
 
 ifeq ($(BOARD), bluesim)

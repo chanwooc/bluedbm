@@ -49,15 +49,15 @@ size_t dstAlloc_sz = FPAGE_SIZE * NUM_TAGS *sizeof(unsigned char);
 size_t srcAlloc_sz = FPAGE_SIZE * NUM_TAGS *sizeof(unsigned char);
 int dstAlloc;
 int srcAlloc;
-unsigned int ref_dstAlloc; 
-unsigned int ref_srcAlloc; 
+unsigned int ref_dstAlloc;
+unsigned int ref_srcAlloc;
 unsigned int* dstBuffer;
 unsigned int* srcBuffer;
 unsigned int* readBuffers[NUM_TAGS];
 unsigned int* writeBuffers[NUM_TAGS];
-TagTableEntry readTagTable[NUM_TAGS]; 
-TagTableEntry writeTagTable[NUM_TAGS]; 
-TagTableEntry eraseTagTable[NUM_TAGS]; 
+TagTableEntry readTagTable[NUM_TAGS];
+TagTableEntry writeTagTable[NUM_TAGS];
+TagTableEntry eraseTagTable[NUM_TAGS];
 FlashStatusT flashStatus[NUM_BUSES][CHIPS_PER_BUS][BLOCKS_PER_CHIP];
 
 int MYPAGE = 8;
@@ -89,8 +89,8 @@ bool checkReadData(int tag) {
 		for (unsigned int word=0; word<FPAGE_SIZE_VALID/sizeof(unsigned int); word++) {
 			goldenData = hashAddrToData(e.bus, e.chip, e.block, word);
 			if (goldenData != readBuffers[tag][word]) {
-				fprintf(stderr, "LOG: **ERROR: read data mismatch! tag=%d, %d %d %d, word=%d, expected: %x, write: %x, read: %x\n", tag, e.bus, e.chip, e.block, word, goldenData, writeBuffers[tag][word], readBuffers[tag][word]);
-				numErrors++; 
+				fprintf(stderr, "LOG: **ERROR: read data mismatch! tag=%d, %d %d %d, word=%d, Expected: %x, read: %x\n", tag, e.bus, e.chip, e.block, word, goldenData, readBuffers[tag][word]);
+				numErrors++;
 				pass = false;
 			}
 		}
@@ -137,6 +137,7 @@ class FlashIndication : public FlashIndicationWrapper
 		FlashIndication(unsigned int id) : FlashIndicationWrapper(id){}
 
 		virtual void readDone(unsigned int tag) {
+			bool tempPass=true;
 
 			if ( verbose ) {
 				//printf( "%s received read page buffer: %d %d\n", log_prefix, rbuf, curReadsInFlight );
@@ -145,10 +146,11 @@ class FlashIndication : public FlashIndicationWrapper
 			}
 
 			//check 
-			testPass = checkReadData(tag);
+			tempPass = checkReadData(tag);
 
 			pthread_mutex_lock(&flashReqMutex);
 			curReadsInFlight --;
+			testPass = tempPass;
 			if ( curReadsInFlight < 0 ) {
 				fprintf(stderr, "LOG: **ERROR: Read requests in flight cannot be negative %d\n", curReadsInFlight );
 				curReadsInFlight = 0;
@@ -215,9 +217,9 @@ int getNumReadsInFlight() { return curReadsInFlight; }
 int getNumWritesInFlight() { return curWritesInFlight; }
 int getNumErasesInFlight() { return curErasesInFlight; }
 
-int lastErase = NUM_TAGS-1;
-int lastRead = NUM_TAGS-1;
-int lastWrite = NUM_TAGS-1;
+//int lastErase = NUM_TAGS-1;
+//int lastRead = NUM_TAGS-1;
+//int lastWrite = NUM_TAGS-1;
 
 //TODO: more efficient locking
 int waitIdleEraseTag() {
@@ -225,11 +227,12 @@ int waitIdleEraseTag() {
 	while ( tag < 0 ) {
 	pthread_mutex_lock(&flashReqMutex);
 
-		for ( int t = (lastErase==NUM_TAGS-1)?0:lastErase+1; t < NUM_TAGS; t++ ) {
+		for ( int t = 0; t < NUM_TAGS; t++ ) {
+		//for ( int t = (lastErase==NUM_TAGS-1)?0:lastErase+1; t < NUM_TAGS; t++ ) {
 			if ( !eraseTagTable[t].busy ) {
 				eraseTagTable[t].busy = true;
 				tag = t;
-				lastErase = t;
+				//lastErase = t;
 				break;
 			}
 		}
@@ -254,11 +257,12 @@ int waitIdleWriteBuffer() {
 	while ( tag < 0 ) {
 	pthread_mutex_lock(&flashReqMutex);
 
-		for ( int t = (lastWrite==NUM_TAGS-1)?0:lastWrite+1; t < NUM_TAGS; t++ ) {
+		for ( int t = 0; t < NUM_TAGS; t++ ) {
+		//for ( int t = (lastWrite==NUM_TAGS-1)?0:lastWrite+1; t < NUM_TAGS; t++ ) {
 			if ( !writeTagTable[t].busy) {
 				writeTagTable[t].busy = true;
 				tag = t;
-				lastWrite=t;
+				//lastWrite=t;
 				break;
 			}
 		}
@@ -284,11 +288,12 @@ int waitIdleReadBuffer() {
 	while ( tag < 0 ) {
 	pthread_mutex_lock(&flashReqMutex);
 
-		for ( int t = (lastRead==NUM_TAGS-1)?0:lastRead+1; t < NUM_TAGS; t++ ) {
+		for ( int t = 0; t < NUM_TAGS; t++ ) {
+		//for ( int t = (lastRead==NUM_TAGS-1)?0:lastRead+1; t < NUM_TAGS; t++ ) {
 			if ( !readTagTable[t].busy ) {
 				readTagTable[t].busy = true;
 				tag = t;
-				lastRead=t;
+				//lastRead=t;
 				break;
 			}
 		}
@@ -400,8 +405,8 @@ int main(int argc, const char **argv)
 
 	for (int t = 0; t < NUM_TAGS; t++) {
 		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
-			readBuffers[t][i] = 0xaaaaaaaa;
-			writeBuffers[t][i] = 0xbbbbbbbb;
+			readBuffers[t][i] = 0xDEADBEEF;
+			writeBuffers[t][i] = 0xDEADBEEF;
 		}
 	}
 
@@ -416,7 +421,7 @@ int main(int argc, const char **argv)
 	
 
 
-	printf( "ERASE START\n" ); fflush(stdout);
+	printf( "TEST ERASE STARTED!\n" ); fflush(stdout);
 	//test erases
 	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
@@ -432,7 +437,7 @@ int main(int argc, const char **argv)
 	}
 	
 	
-	printf( "TEST ERASE START\n" ); fflush(stdout);
+	printf( "TEST ERASED PAGES STARTED!\n" ); fflush(stdout);
 	//read back erased pages
 	for (int bus = 0; bus < NUM_BUSES; bus++){
 		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
@@ -441,29 +446,18 @@ int main(int argc, const char **argv)
 				readPage(bus, chip, blk, page, waitIdleReadBuffer());
 			}
 		}
-		while (true) {
+		// while (prev)
+	}
+	
+	while (true) {
 			usleep(100);
 			if ( getNumReadsInFlight() == 0 ) break;
 	}
-	}
-	lastRead = NUM_TAGS-1;
-
-	usleep(10000);
-
-	for (int t = 0; t < NUM_TAGS; t++) {
-		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
-			readBuffers[t][i] = 0xcccccccc;
-			writeBuffers[t][i] = 0xdddddddd;
-		}
-	}
-	
-	//portalCacheFlush(dstAlloc, dstBuffer, dstAlloc_sz, 1);
-	//portalCacheFlush(srcAlloc, srcBuffer, srcAlloc_sz, 1);
 
 	//write pages
 	//FIXME: in old xbsv, simulatneous DMA reads using multiple readers cause kernel panic
 	//Issue each bus separately for now
-	printf( "WRITE START\n" ); fflush(stdout);
+	printf( "TEST WRITE STARTED!\n" ); fflush(stdout);
 	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
 			for (int bus = 0; bus < NUM_BUSES; bus++){
@@ -479,17 +473,18 @@ int main(int argc, const char **argv)
 			}
 		}
 	} //each bus
-		while (true) {
-			usleep(100);
-			if ( getNumWritesInFlight() == 0 ) break;
-		}
+	
+	while (true) {
+		usleep(100);
+		if ( getNumWritesInFlight() == 0 ) break;
+	}
 	
 
 
 	timespec start, now;
 	clock_gettime(CLOCK_REALTIME, & start);
 	
-	printf( "READ SINGLE BUS START\n" ); fflush(stdout);
+	printf( "TEST READ SINGLE BUS 1 STARTED!\n" ); fflush(stdout);
 	for (int repeat = 0; repeat < 1; repeat++){
 		for (int bus = 0; bus < NUM_BUSES; bus++){
 			for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
@@ -498,16 +493,22 @@ int main(int argc, const char **argv)
 					readPage(bus, chip, blk, page, waitIdleReadBuffer());
 				}
 			}
-			
-			while (true) {
-				usleep(100);
-				if ( getNumReadsInFlight() == 0 ) break;
-			}
+			//while
 		}
 	}
-	lastRead = NUM_TAGS-1;
+	
+	while (true) {
+		usleep(100);
+		if ( getNumReadsInFlight() == 0 ) break;
+	}
 
-	printf( "READ MULTI BUS START\n" ); fflush(stdout);
+	for (int t = 0; t < NUM_TAGS; t++) {
+		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
+			readBuffers[t][i] = 0xDEADBEEF;
+		}
+	}
+
+	printf( "TEST READ MULTI BUS STARTED!\n" ); fflush(stdout);
 	for (int repeat = 0; repeat < 1; repeat++){
 		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
@@ -515,15 +516,15 @@ int main(int argc, const char **argv)
 					int page = MYPAGE;
 					readPage(bus, chip, blk, page, waitIdleReadBuffer());
 				}
-
-				while (true) {
-				usleep(100);
-				if ( getNumReadsInFlight() == 0 ) break;
-				}
 			}
 		}
 	}
-	
+
+	while (true) {
+		usleep(100);
+		if ( getNumReadsInFlight() == 0 ) break;
+	}
+
 	int elapsed = 0;
 	while (true) {
 		usleep(100);

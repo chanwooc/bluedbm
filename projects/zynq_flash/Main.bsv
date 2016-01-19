@@ -85,8 +85,8 @@ Integer dmaBurstWordsLast = 2;//(pageSizeUser%dmaBurstBytes)/wordBytes; //num bu
 
 interface MainIfc;
 	interface FlashRequest request;
-	interface Vector#(NumberOfMasters, MemWriteClient#(DataBusWidth)) dmaWriteClient;
-	interface Vector#(NumberOfMasters, MemReadClient#(DataBusWidth)) dmaReadClient;
+	interface Vector#(NumWriteClients, MemWriteClient#(DataBusWidth)) dmaWriteClient;
+	interface Vector#(NumReadClients, MemReadClient#(DataBusWidth)) dmaReadClient;
 	interface Aurora_Pins#(4) aurora_fmc1;
 	interface Aurora_Clock_Pins aurora_clk_fmc1;
 endinterface
@@ -115,24 +115,26 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	`endif
 
 	//Create read/write engines with NUM_BUSES memservers
-	Vector#(NumberOfMasters, MemReadEngine#(DataBusWidth, DataBusWidth, 4, TDiv#(NUM_BUSES,NumberOfMasters))) re <- replicateM(mkMemReadEngine);
-	Vector#(NumberOfMasters, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumberOfMasters))) we <- replicateM(mkMemWriteEngine);
+	Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 4, TDiv#(NUM_BUSES,NumReadClients))) re <- replicateM(mkMemReadEngine);
+	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
 	//MemwriteEngineV#(WordSz, 2, NUM_BUSES) we <- mkMemwriteEngineBuff(1024);
 
-	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumberOfMasters, MemReadEngine#(DataBusWidth, DataBusWidth,  4, TDiv#(NUM_BUSES,NumberOfMasters))) rengine, Integer idx ) ;
+	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth,  4, TDiv#(NUM_BUSES,NumReadClients))) rengine, Integer idx ) ;
 		//let numOfMasters = valueOf(NumberOfMasters);
 		//let numBuses = valueOf(NUM_BUSES);
 		
 		//return rengine[idx/2].readServers[idx%2];
-		return rengine[0].readServers[idx];
+		//return rengine[0].readServers[idx];
+		return rengine[idx].readServers[0];
 	endfunction
 	
-	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumberOfMasters, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumberOfMasters))) wengine, Integer idx ) ;
+	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumReadClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumReadClients))) wengine, Integer idx ) ;
 		//let numOfMasters = valueOf(NumberOfMasters);
 		//let numBuses = valueOf(NUM_BUSES);
 		
 		//return wengine[idx/2].writeServers[idx%2];
-		return wengine[0].writeServers[idx];
+		//return wengine[0].writeServers[idx];
+		return wengine[idx].writeServers[0];
 	endfunction
 
 	Vector#(NUM_BUSES, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));
@@ -492,12 +494,15 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 
 
 	
-	Vector#(NumberOfMasters, MemWriteClient#(DataBusWidth)) dmaWriteClientVec; // = vec(we.dmaClient); BuildVector
-	Vector#(NumberOfMasters, MemReadClient#(DataBusWidth)) dmaReadClientVec;
+	Vector#(NumWriteClients, MemWriteClient#(DataBusWidth)) dmaWriteClientVec; // = vec(we.dmaClient); 
+	Vector#(NumReadClients, MemReadClient#(DataBusWidth)) dmaReadClientVec;
 
-	for (Integer tt = 0; tt < valueOf(NumberOfMasters); tt=tt+1) begin
-		dmaWriteClientVec[tt] = we[tt].dmaClient;
+	for (Integer tt = 0; tt < valueOf(NumReadClients); tt=tt+1) begin
 		dmaReadClientVec[tt] = re[tt].dmaClient;
+	end
+
+	for (Integer tt = 0; tt < valueOf(NumWriteClients); tt=tt+1) begin
+		dmaWriteClientVec[tt] = we[tt].dmaClient;
 	end
 
 	interface FlashRequest request;
