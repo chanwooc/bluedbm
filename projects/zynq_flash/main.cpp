@@ -62,7 +62,7 @@ FlashStatusT flashStatus[NUM_BUSES][CHIPS_PER_BUS][BLOCKS_PER_CHIP];
 
 int MYPAGE = 8;
 
-bool testPass = true;
+bool testPassed = false;
 bool verbose = true;
 int curReadsInFlight = 0;
 int curWritesInFlight = 0;
@@ -137,7 +137,7 @@ class FlashIndication : public FlashIndicationWrapper
 		FlashIndication(unsigned int id) : FlashIndicationWrapper(id){}
 
 		virtual void readDone(unsigned int tag) {
-			bool tempPass=true;
+			bool tempPassed = true;
 
 			if ( verbose ) {
 				//printf( "%s received read page buffer: %d %d\n", log_prefix, rbuf, curReadsInFlight );
@@ -146,18 +146,21 @@ class FlashIndication : public FlashIndicationWrapper
 			}
 
 			//check 
-			tempPass = checkReadData(tag);
+			tempPassed = checkReadData(tag);
 
 			pthread_mutex_lock(&flashReqMutex);
 			curReadsInFlight --;
-			testPass = tempPass;
+			if ( tempPassed == false ) {
+				testPassed = false;
+				printf("LOG: **ERROR: check read data failed @ tag=%d\n",tag);
+			}
 			if ( curReadsInFlight < 0 ) {
 				fprintf(stderr, "LOG: **ERROR: Read requests in flight cannot be negative %d\n", curReadsInFlight );
 				curReadsInFlight = 0;
 			}
 			if ( readTagTable[tag].busy == false ) {
 				fprintf(stderr, "LOG: **ERROR: received unused buffer read done %d\n", tag);
-				testPass = false;
+				testPassed = false;
 			}
 			readTagTable[tag].busy = false;
 			//pthread_cond_broadcast(&flashFreeTagCond);
@@ -175,7 +178,7 @@ class FlashIndication : public FlashIndicationWrapper
 			}
 			if ( writeTagTable[tag].busy == false ) {
 				fprintf(stderr, "LOG: **ERROR: received unused buffer Write done %d\n", tag);
-				testPass = false;
+				testPassed = false;
 			}
 			writeTagTable[tag].busy = false;
 			pthread_mutex_unlock(&flashReqMutex);
@@ -195,7 +198,7 @@ class FlashIndication : public FlashIndicationWrapper
 			}
 			if ( eraseTagTable[tag].busy == false ) {
 				fprintf(stderr, "LOG: **ERROR: received unused tag erase done %d\n", tag);
-				testPass = false;
+				testPassed = false;
 			}
 			eraseTagTable[tag].busy = false;
 			pthread_mutex_unlock(&flashReqMutex);
@@ -355,6 +358,7 @@ int main(int argc, const char **argv)
 	//DmaManager *dma = new DmaManager(dmap);
 	//MemServerIndication hostMemServerIndication(hostMemServerRequest, HostMemServerIndicationH2S);
 	//MMUIndication hostMMUIndication(dma, HostMMUIndicationH2S);
+	testPassed=true;
 	fprintf(stderr, "Initializing DMA...\n");
 
 	device = new FlashRequestProxy(FlashRequestS2H);
@@ -379,8 +383,8 @@ int main(int argc, const char **argv)
 	//portalExec_start();
 	printf( "Done portalExec_start\n" ); fflush(stdout);
 
-	portalCacheFlush(dstAlloc, dstBuffer, dstAlloc_sz, 1);
-	portalCacheFlush(srcAlloc, srcBuffer, srcAlloc_sz, 1);
+	//portalCacheFlush(dstAlloc, dstBuffer, dstAlloc_sz, 1);
+	//portalCacheFlush(srcAlloc, srcBuffer, srcAlloc_sz, 1);
 	ref_dstAlloc = dma->reference(dstAlloc);
 	ref_srcAlloc = dma->reference(srcAlloc);
 
@@ -406,9 +410,16 @@ int main(int argc, const char **argv)
 	for (int t = 0; t < NUM_TAGS; t++) {
 		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
 			readBuffers[t][i] = 0xDEADBEEF;
-			writeBuffers[t][i] = 0xDEADBEEF;
+			writeBuffers[t][i] = 0xBEEFDEAD;
 		}
 	}
+
+	long actualFrequency=0;
+	long requestedFrequency=1e9/MainClockPeriod;
+	int status = setClockFrequency(0, requestedFrequency, &actualFrequency);
+	fprintf(stderr, "Requested Freq: %5.2f, Actual Freq: %5.2f, status=%d\n"
+			,(double)requestedFrequency*1.0e-6
+			,(double)actualFrequency*1.0e-6,status);
 
 	device->start(0);
 	device->setDebugVals(0,0); //flag, delay
@@ -542,13 +553,14 @@ int main(int argc, const char **argv)
 	clock_gettime(CLOCK_REALTIME, & now);
 	fprintf(stderr, "LOG: finished reading from page! %f\n", timespec_diff_sec(start, now) );
 
-	sleep(1);
+	sleep(2);
 //	for ( int t = 0; t < NUM_TAGS; t++ ) {
 //		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
 //			fprintf(stderr,  "%d %d %x\n", t, i, writeBuffers[t][i] );
 //		}
 //	}
-	if (testPass==true) {
+	printf("testPassed: %d\n",testPassed?1:0);
+	if (testPassed==true) {
 		fprintf(stderr, "LOG: TEST PASSED!\n");
 	}
 	else {

@@ -5,7 +5,7 @@ INTERFACES = FlashRequest FlashIndication
 PIN_TYPE=Top_Pins
 PIN_TYPE_INCLUDE=TopPins
 
-# specific for ZYNQ
+# specific for ZYNQ - Four Masters
 NUMBER_OF_MASTERS=4
 PLATFORM_NUMBER_OF_MASTERS=4
 
@@ -19,7 +19,7 @@ BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 CPPFILES=main.cpp
 
 CONNECTALFLAGS  = -D DataBusWidth=64
-CONNECTALFLAGS  = -D NumReadClients=8 -D NumWriteClients=8
+CONNECTALFLAGS += -D NumReadClients=8 -D NumWriteClients=8
 CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
 
 ifeq ($(BOARD), bluesim)

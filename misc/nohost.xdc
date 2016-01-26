@@ -9,6 +9,8 @@ set_max_delay -from [get_clocks auroraI_drp_clk_i] -to [get_clocks -of_objects [
 set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks auroraI_init_clk_i] -datapath_only 5.0
 set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -datapath_only 5.0
 
+set_false_path -from [get_clocks GT_REFCLK1] -to [get_clocks auroraI_drp_clk_i]
+set_false_path -from [get_clocks GT_REFCLK1] -to [get_clocks auroraI_init_clk_i]
 
 #    #CDC from aurora clk (TS_user_clk_i_all) to/from clkgen_pll_CLKOUT0(125MHz clk)
 #    set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks TS_user_clk_i_all] -datapath_only 8.0
@@ -34,8 +36,6 @@ set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks -of_objects 
 #    set_false_path -from [get_clocks clkgen_pll_CLKOUT0*] -to [get_clocks clkgen_pll_CLKOUT1*]
 #    
 #    ## added by cw for v15.07.3
-#    #set_false_path -from [get_clocks GT_REFCLK1] -to [get_clocks auroraI_drp_clk_i]
-#    #set_false_path -from [get_clocks GT_REFCLK1] -to [get_clocks auroraI_init_clk_i]
 #    
 #    #set_false_path -from [get_clocks clkgen_pll_CLKOUT0_1] -to [get_clocks auroraI_user_clk_i]
 #    #set_false_path -from [get_clocks auroraI_user_clk_i] -to [get_clocks clkgen_pll_CLKOUT0_1]
