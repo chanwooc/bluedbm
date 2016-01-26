@@ -15,9 +15,11 @@ flashemul/vc707/
 tools
 bsimall
 
-vc707
-bluesim
-build
+vc707*
+bluesim*
+build*
+zc706*
+verilator*
 
 *.tgz
 
