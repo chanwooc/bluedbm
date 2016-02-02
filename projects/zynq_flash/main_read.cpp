@@ -18,7 +18,8 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define BLOCKS_PER_CHIP 2
+#define PAGES_PER_BLOCK 128
+#define BLOCKS_PER_CHIP 512
 #define CHIPS_PER_BUS 8 // 8
 #define NUM_BUSES 8 // 8
 
@@ -495,8 +496,8 @@ int main(int argc, const char **argv)
 //	}
 //	
 	printf( "FAKE READ STARTED!\n" ); fflush(stdout);
-		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+		for (int blk = 0; blk < 2; blk++){
+			for (int chip = 0; chip < 8; chip++){
 				for (int bus = 0; bus < NUM_BUSES; bus++){
 					int page = MYPAGE;
 					readPage(bus, chip, blk, page, waitIdleReadBuffer());
@@ -512,14 +513,13 @@ int main(int argc, const char **argv)
 	timespec start, now;
 	clock_gettime(CLOCK_REALTIME, & start);
 	
-	int REPEAT=1000;
+	int REPEAT=1;
 
 	printf( "TEST READ SINGLE BUS 1 STARTED!\n" ); fflush(stdout);
-	for (int repeat = 0; repeat < REPEAT; repeat++){
+	for (int page  = 0; page < PAGES_PER_BLOCK; page++){
 		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
 				for (int bus = 0; bus < NUM_BUSES; bus++){
-					int page = MYPAGE;
 					readPage(bus, chip, blk, page, waitIdleReadBuffer());
 				}
 			}
@@ -533,7 +533,7 @@ int main(int argc, const char **argv)
 	
 	clock_gettime(CLOCK_REALTIME, & now);
 	fprintf(stderr, "LOG: finished reading from page! %f\n", timespec_diff_sec(start, now) );
-	fprintf(stderr, "SPEED: %f MB/s\n", (8224*128.0*REPEAT/1000000)/timespec_diff_sec(start,now));
+	fprintf(stderr, "SPEED: %f MB/s\n", (8224.0*PAGES_PER_BLOCK*BLOCKS_PER_CHIP*CHIPS_PER_BUS*NUM_BUSES*REPEAT/1000000)/timespec_diff_sec(start,now));
 
 	//for (int t = 0; t < NUM_TAGS; t++) {
 	//	for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {

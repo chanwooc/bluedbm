@@ -18,7 +18,7 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define BLOCKS_PER_CHIP 2
+#define BLOCKS_PER_CHIP 64
 #define CHIPS_PER_BUS 8 // 8
 #define NUM_BUSES 8 // 8
 
@@ -419,6 +419,13 @@ int main(int argc, const char **argv)
 		}
 	}
 
+	long actualFrequency=0;
+	long requestedFrequency=1e9/MainClockPeriod;
+	int status = setClockFrequency(0, requestedFrequency, &actualFrequency);
+	fprintf(stderr, "Requested Freq: %5.2f, Actual Freq: %5.2f, status=%d\n"
+			,(double)requestedFrequency*1.0e-6
+			,(double)actualFrequency*1.0e-6,status);
+
 	device->start(0);
 	device->setDebugVals(0,0); //flag, delay
 
@@ -465,7 +472,7 @@ int main(int argc, const char **argv)
 //
 	timespec start, now;
 	clock_gettime(CLOCK_REALTIME, & start);
-	int REPEAT=2000;
+	int REPEAT=128;
 //	//write pages
 //	//FIXME: in old xbsv, simulatneous DMA reads using multiple readers cause kernel panic
 //	//Issue each bus separately for now
@@ -526,7 +533,7 @@ int main(int argc, const char **argv)
 	
 	clock_gettime(CLOCK_REALTIME, & now);
 	fprintf(stderr, "LOG: finished reading from page! %f\n", timespec_diff_sec(start, now) );
-	fprintf(stderr, "SPEED: %f MB/s\n", (8224*128.0*REPEAT/1000000)/timespec_diff_sec(start,now));
+	fprintf(stderr, "SPEED: %f MB/s\n", (8224.0*NUM_BUSES*CHIPS_PER_BUS*BLOCKS_PER_CHIP*REPEAT/1000000)/timespec_diff_sec(start,now));
 
 	//for (int t = 0; t < NUM_TAGS; t++) {
 	//	for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
