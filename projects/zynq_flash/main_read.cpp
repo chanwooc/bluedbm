@@ -515,7 +515,7 @@ int main(int argc, const char **argv)
 	
 	int REPEAT=1;
 
-	printf( "TEST READ SINGLE BUS 1 STARTED!\n" ); fflush(stdout);
+	printf( "TEST READ BANDWIDTH STARTED!\n" ); fflush(stdout);
 	for (int page  = 0; page < PAGES_PER_BLOCK; page++){
 		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){

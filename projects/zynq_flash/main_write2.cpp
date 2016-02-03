@@ -18,8 +18,8 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define PAGES_PER_BLOCK 1
-#define BLOCKS_PER_CHIP 512
+#define PAGES_PER_BLOCK 64
+#define BLOCKS_PER_CHIP 256
 #define CHIPS_PER_BUS 8 // 8
 #define NUM_BUSES 8 // 8
 

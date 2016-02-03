@@ -130,7 +130,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 		return rengine[idx].readServers[0];
 	endfunction
 	
-	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumReadClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumReadClients))) wengine, Integer idx ) ;
+	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumWriteClients))) wengine, Integer idx ) ;
 		//let numOfMasters = valueOf(NumberOfMasters);
 		//let numBuses = valueOf(NUM_BUSES);
 		
