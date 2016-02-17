@@ -56,6 +56,7 @@ create_clock -name GT_REFCLK1 -period 3.636	 [get_pins */fmc1_gtx_clk_i/O]
 set_property LOC AA7 [get_ports aurora_clk_fmc1_gtx_clk_n_v]
 set_property LOC AA8 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
 
+# 110MHz user_clk -> 4.4Gbps*8/10*4 = 14.08Gbps = 128bit * 110M
 create_clock -name auroraI_user_clk_i -period 9.091	 [get_pins -hierarchical -regexp {.*/aurora_module_i/clock_module_i/user_clk_buf_i/O}]
 
 # 20.0 ns period Board Clock Constraint 
@@ -65,64 +66,12 @@ create_clock -name auroraI_init_clk_i -period 20.0 [get_pins -hierarchical -rege
 create_clock -name auroraI_drp_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*/auroraIntraClockDiv4_slowbuf/O}] -add
 
 ###### CDC in RESET_LOGIC from INIT_CLK to USER_CLK ##############
-#set_false_path -to [get_pins -hier *cdc_to*]
 set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks auroraI_user_clk_i] -datapath_only 9.091	 
 
 #CDC from auroraI_user_clk_i to/from  (200mhz system clk)
-#Warning: The following constraints must be sourced AFTER vc707.xdc! *** zc706.xdc update
+#Warning: The following constraints must be sourced AFTER zc707.xdc!
 set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks auroraI_user_clk_i] -datapath_only 5.0
 set_max_delay -from [get_clocks auroraI_user_clk_i] -to [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -datapath_only 5.0
-
-###################### Locatoin constrain #########################
-#set_property LOC AD18 [get_ports INIT_CLK_P]
-#set_property LOC AD19 [get_ports INIT_CLK_N]
-#set_property LOC AK25 [get_ports RESET]
-#set_property LOC R27 [get_ports GT_RESET_IN]
-#set_property LOC Y21 [get_ports CHANNEL_UP]
-#set_property LOC W21 [get_ports LANE_UP[0]]
-#set_property LOC G2 [get_ports LANE_UP[1]]
-#set_property LOC A17 [get_ports LANE_UP[2]]
-#set_property LOC C14 [get_ports LANE_UP[3]]
-#set_property LOC AA28 [get_ports HARD_ERR]   
-#set_property LOC AA27 [get_ports SOFT_ERR]   
-#set_property LOC AA29 [get_ports ERR_COUNT[0]]   
-#set_property LOC Y28 [get_ports ERR_COUNT[1]]   
-#set_property LOC Y27 [get_ports ERR_COUNT[2]]   
-#set_property LOC Y26 [get_ports ERR_COUNT[3]]   
-#set_property LOC AB30 [get_ports ERR_COUNT[4]]   
-#set_property LOC AB29 [get_ports ERR_COUNT[5]]   
-#set_property LOC AA30 [get_ports ERR_COUNT[6]]   
-#set_property LOC Y30 [get_ports ERR_COUNT[7]]   
-#   
-# 
-#set_property LOC H4 [get_ports DRP_CLK_IN]
-##// DRP CLK needs a clock LOC
-#    
-#set_property IOSTANDARD DIFF_HSTL_II_18 [get_ports INIT_CLK_P]
-#set_property IOSTANDARD DIFF_HSTL_II_18 [get_ports INIT_CLK_N]
-#set_property IOSTANDARD LVCMOS18 [get_ports RESET]
-#set_property IOSTANDARD LVCMOS18 [get_ports GT_RESET_IN]
-#set_property IOSTANDARD LVCMOS18 [get_ports CHANNEL_UP]
-#set_property IOSTANDARD LVCMOS18 [get_ports LANE_UP[0]]
-#set_property IOSTANDARD LVCMOS18 [get_ports LANE_UP[1]]
-#set_property IOSTANDARD LVCMOS18 [get_ports LANE_UP[2]]
-#set_property IOSTANDARD LVCMOS18 [get_ports LANE_UP[3]]
-#set_property IOSTANDARD LVCMOS18 [get_ports HARD_ERR]   
-#set_property IOSTANDARD LVCMOS18 [get_ports SOFT_ERR]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[0]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[1]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[2]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[3]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[4]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[5]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[6]]   
-#set_property IOSTANDARD LVCMOS18 [get_ports ERR_COUNT[7]]   
-#    
-#    
-#set_property IOSTANDARD LVCMOS18 [get_ports DRP_CLK_IN]
-##// DRP CLK needs a clock IOSTDLOC
-#    
-###################################################################
 
 
 ############################### GT LOC ###################################
@@ -131,22 +80,22 @@ set_property LOC GTXE2_CHANNEL_X0Y5 [get_cells -hierarchical -regexp {.*/aurora_
 set_property LOC GTXE2_CHANNEL_X0Y6 [get_cells -hierarchical -regexp {.*/aurora_8b10b_zynq_i/inst/gt_wrapper_i/aurora_8b10b_zynq_multi_gt_i/gt2_aurora_8b10b_zynq_i/gtxe2_i}]
 set_property LOC GTXE2_CHANNEL_X0Y7 [get_cells -hierarchical -regexp {.*/aurora_8b10b_zynq_i/inst/gt_wrapper_i/aurora_8b10b_zynq_multi_gt_i/gt3_aurora_8b10b_zynq_i/gtxe2_i}]
   
-  # X1Y4
+  # X0Y4
  set_property LOC AH2 [get_ports { aurora_fmc1_TXP[3] }]
  set_property LOC AH1 [get_ports { aurora_fmc1_TXN[3] }]
  set_property LOC AH6 [get_ports { aurora_fmc1_rxp_i[3] }]
  set_property LOC AH5 [get_ports { aurora_fmc1_rxn_i[3] }]
-  # X1Y5
+  # X0Y5
  set_property LOC AF2 [get_ports { aurora_fmc1_TXP[2] }]
  set_property LOC AF1 [get_ports { aurora_fmc1_TXN[2] }]
  set_property LOC AG4 [get_ports { aurora_fmc1_rxp_i[2] }]
  set_property LOC AG3 [get_ports { aurora_fmc1_rxn_i[2] }]
-  # X1Y6
+  # X0Y6
  set_property LOC AE4 [get_ports { aurora_fmc1_TXP[1] }]
  set_property LOC AE3 [get_ports { aurora_fmc1_TXN[1] }]
  set_property LOC AF6 [get_ports { aurora_fmc1_rxp_i[1] }]
  set_property LOC AF5 [get_ports { aurora_fmc1_rxn_i[1] }]
-  # X1Y7
+  # X0Y7
  set_property LOC AD2 [get_ports { aurora_fmc1_TXP[0] }]
  set_property LOC AD1 [get_ports { aurora_fmc1_TXN[0] }]
  set_property LOC AD6 [get_ports { aurora_fmc1_rxp_i[0] }]
