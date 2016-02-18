@@ -31,8 +31,9 @@ BLUEDBM_XDC = ../../misc/nohost.xdc
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_8b10b_zynq/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci \
-	-C ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
+	--constraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
 	--constraint $(BLUEDBM_XDC) \
+	--implconstraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
 	--implconstraint $(BLUEDBM_XDC) 
 
 AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq_stub.v
