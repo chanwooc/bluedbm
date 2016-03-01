@@ -664,7 +664,6 @@
          .power_down(power_down_i),
          .loopback(loopback_i),
          .pma_init(gt_reset_i),
-         .gt_pll_lock(gt_pll_lock_i),
          .drp_clk_in(tied_to_ground_i), // originally DRP_CLK_IN
 
 ////     // ---------- AXI4-Lite input signals ---------------
@@ -700,7 +699,7 @@
 ////         .mmcm_not_locked_out                   (pll_not_locked_i),
 
 		.init_clk_in(INIT_CLK_IN),
-         .sys_reset_out                            (system_reset_i),
+         .sys_reset_out                            (system_reset_i)
 ////         .tx_out_clk                               (tx_out_clk_i)
      );
 

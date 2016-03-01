@@ -190,8 +190,8 @@
 	wire           qpll_drpen_in = 1'b0; 
 	wire           qpll_drpwe_in = 1'b0; 
 	
-	wire                     gt_qpllclk_quad7_i;
-	wire                     gt_qpllrefclk_quad7_i;
+	wire                     gt_qpllclk_quad1_i;
+	wire                     gt_qpllrefclk_quad1_i;
 	wire                     gt_to_common_qpllreset_i;
 	wire [0:CORE_COUNT]      gt_to_common_qpllreset_v;
 	wire                     gt_qpllrefclklost_i; 
@@ -291,7 +291,7 @@ aurora_64b66b_gt_common_wrapper gt_common_support
 
     .GT0_QPLLLOCKDETCLK_IN (INIT_CLK_i),
 
-    .GT0_QPLLREFCLKLOST_OUT (gt_qpllrefclklost_i),
+    .GT0_QPLLREFCLKLOST_OUT (gt_qpllrefclklost_i)
 
 
     //---------------------- Common DRP Ports ----------------------
@@ -440,8 +440,8 @@ aurora_64b66b_gt_common_wrapper gt_common_support
          .gt_pll_lock(gt_pll_lock[0]),
          .drp_clk_in(drp_clk_in),
 //---{
-       .gt_qpllclk_quad7_in        (gt_qpllclk_quad7_i         ),
-       .gt_qpllrefclk_quad7_in     (gt_qpllrefclk_quad7_i      ),   
+       .gt_qpllclk_quad1_in        (gt_qpllclk_quad1_i         ),
+       .gt_qpllrefclk_quad1_in     (gt_qpllrefclk_quad1_i      ),   
 
        .gt_to_common_qpllreset_out  (gt_to_common_qpllreset_v[0]    ),
        .gt_qplllock_in       (gt_qplllock_i        ), 
@@ -452,15 +452,18 @@ aurora_64b66b_gt_common_wrapper gt_common_support
          .s_axi_awvalid(s_axi_awvalid), 
          .s_axi_awready(), 
          .s_axi_wdata(s_axi_wdata),
+		 .s_axi_wstrb(),
          .s_axi_wvalid(s_axi_wvalid), 
          .s_axi_wready(), 
          .s_axi_bvalid(), 
+		 .s_axi_bresp(),
          .s_axi_bready(s_axi_bready), 
          .s_axi_araddr(s_axi_araddr),
          .s_axi_arvalid(s_axi_arvalid), 
          .s_axi_arready(), 
          .s_axi_rdata(),
          .s_axi_rvalid(), 
+		 .s_axi_rresp(),
          .s_axi_rready(s_axi_rready), 
     //---------------------- GTXE2 COMMON DRP Ports ----------------------
          .qpll_drpaddr_in(qpll_drpaddr_in),
@@ -525,8 +528,8 @@ aurora_64b66b_X0Y1 aurora_64b66b_X0Y1_i
          .gt_pll_lock(gt_pll_lock[1]),
          .drp_clk_in(drp_clk_in),
 //---{
-       .gt_qpllclk_quad7_in        (gt_qpllclk_quad7_i         ),
-       .gt_qpllrefclk_quad7_in     (gt_qpllrefclk_quad7_i      ),   
+       .gt_qpllclk_quad1_in        (gt_qpllclk_quad1_i         ),
+       .gt_qpllrefclk_quad1_in     (gt_qpllrefclk_quad1_i      ),   
 
        .gt_to_common_qpllreset_out  (gt_to_common_qpllreset_v[1]    ),
        .gt_qplllock_in       (gt_qplllock_i        ), 
@@ -537,15 +540,18 @@ aurora_64b66b_X0Y1 aurora_64b66b_X0Y1_i
          .s_axi_awvalid(s_axi_awvalid), 
          .s_axi_awready(), 
          .s_axi_wdata(s_axi_wdata),
+		 .s_axi_wstrb(),
          .s_axi_wvalid(s_axi_wvalid), 
          .s_axi_wready(), 
          .s_axi_bvalid(), 
+		 .s_axi_bresp(),
          .s_axi_bready(s_axi_bready), 
          .s_axi_araddr(s_axi_araddr),
          .s_axi_arvalid(s_axi_arvalid), 
          .s_axi_arready(), 
          .s_axi_rdata(),
          .s_axi_rvalid(), 
+		 .s_axi_rresp(),
          .s_axi_rready(s_axi_rready), 
     //---------------------- GTXE2 COMMON DRP Ports ----------------------
          .qpll_drpaddr_in(qpll_drpaddr_in),
@@ -609,8 +615,8 @@ aurora_64b66b_X0Y2 aurora_64b66b_X0Y2_i
          .gt_pll_lock(gt_pll_lock[2]),
          .drp_clk_in(drp_clk_in),
 //---{
-       .gt_qpllclk_quad7_in        (gt_qpllclk_quad7_i         ),
-       .gt_qpllrefclk_quad7_in     (gt_qpllrefclk_quad7_i      ),   
+       .gt_qpllclk_quad1_in        (gt_qpllclk_quad1_i         ),
+       .gt_qpllrefclk_quad1_in     (gt_qpllrefclk_quad1_i      ),   
 
        .gt_to_common_qpllreset_out  (gt_to_common_qpllreset_v[2]    ),
        .gt_qplllock_in       (gt_qplllock_i        ), 
@@ -621,15 +627,18 @@ aurora_64b66b_X0Y2 aurora_64b66b_X0Y2_i
          .s_axi_awvalid(s_axi_awvalid), 
          .s_axi_awready(), 
          .s_axi_wdata(s_axi_wdata),
+		 .s_axi_wstrb(),
          .s_axi_wvalid(s_axi_wvalid), 
          .s_axi_wready(), 
          .s_axi_bvalid(), 
+		 .s_axi_bresp(),
          .s_axi_bready(s_axi_bready), 
          .s_axi_araddr(s_axi_araddr),
          .s_axi_arvalid(s_axi_arvalid), 
          .s_axi_arready(), 
          .s_axi_rdata(),
          .s_axi_rvalid(), 
+		 .s_axi_rresp(),
          .s_axi_rready(s_axi_rready), 
     //---------------------- GTXE2 COMMON DRP Ports ----------------------
          .qpll_drpaddr_in(qpll_drpaddr_in),
@@ -693,8 +702,8 @@ aurora_64b66b_X0Y3 aurora_64b66b_X0Y3_i
          .gt_pll_lock(gt_pll_lock[3]),
          .drp_clk_in(drp_clk_in),
 //---{
-       .gt_qpllclk_quad7_in        (gt_qpllclk_quad7_i         ),
-       .gt_qpllrefclk_quad7_in     (gt_qpllrefclk_quad7_i      ),   
+       .gt_qpllclk_quad1_in        (gt_qpllclk_quad1_i         ),
+       .gt_qpllrefclk_quad1_in     (gt_qpllrefclk_quad1_i      ),   
 
        .gt_to_common_qpllreset_out  (gt_to_common_qpllreset_v[3]    ),
        .gt_qplllock_in       (gt_qplllock_i        ), 
@@ -705,15 +714,18 @@ aurora_64b66b_X0Y3 aurora_64b66b_X0Y3_i
          .s_axi_awvalid(s_axi_awvalid), 
          .s_axi_awready(), 
          .s_axi_wdata(s_axi_wdata),
+		 .s_axi_wstrb(),
          .s_axi_wvalid(s_axi_wvalid), 
          .s_axi_wready(), 
          .s_axi_bvalid(), 
+		 .s_axi_bresp(),
          .s_axi_bready(s_axi_bready), 
          .s_axi_araddr(s_axi_araddr),
          .s_axi_arvalid(s_axi_arvalid), 
          .s_axi_arready(), 
          .s_axi_rdata(),
          .s_axi_rvalid(), 
+		 .s_axi_rresp(),
          .s_axi_rready(s_axi_rready), 
     //---------------------- GTXE2 COMMON DRP Ports ----------------------
          .qpll_drpaddr_in(qpll_drpaddr_in),

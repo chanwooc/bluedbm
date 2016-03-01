@@ -15,6 +15,9 @@ if {[version -short] >= "2015.2"} {
     ## this version changed pinout
     set core_version {10.0}
 }
+if {[version -short] >= "2015.4"} {
+    set core_version {11.0}
+}
 
 foreach loc $locs {
     set loc_plus_1 [expr $loc + 1]
