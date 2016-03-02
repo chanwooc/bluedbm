@@ -18,9 +18,12 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define BLOCKS_PER_CHIP 64
+#define PAGES_PER_BLOCK 64
+#define BLOCKS_PER_CHIP 256
 #define CHIPS_PER_BUS 8 // 8
 #define NUM_BUSES 8 // 8
+
+#define REPEAT 1
 
 #define FPAGE_SIZE (8192*2)
 #define FPAGE_SIZE_VALID (8224)
@@ -357,12 +360,6 @@ void readPage(int bus, int chip, int block, int page, int tag) {
 
 int main(int argc, const char **argv)
 {
-
-    //MemServerRequestProxy *hostMemServerRequest = new MemServerRequestProxy(HostMemServerRequestS2H);
-	//MMURequestProxy *dmap = new MMURequestProxy(HostMMURequestS2H);
-	//DmaManager *dma = new DmaManager(dmap);
-	//MemServerIndication hostMemServerIndication(hostMemServerRequest, HostMemServerIndicationH2S);
-	//MMUIndication hostMMUIndication(dma, HostMMUIndicationH2S);
 	testPassed=true;
 	fprintf(stderr, "Initializing DMA...\n");
 
@@ -451,112 +448,33 @@ int main(int argc, const char **argv)
 		usleep(100);
 		if ( getNumErasesInFlight() == 0 ) break;
 	}
-//	
-//	
-//	printf( "TEST ERASED PAGES STARTED!\n" ); fflush(stdout);
-//	//read back erased pages
-//	for (int bus = 0; bus < NUM_BUSES; bus++){
-//		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-//			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-//				int page = MYPAGE;
-//				readPage(bus, chip, blk, page, waitIdleReadBuffer());
-//			}
-//		}
-//		// while (prev)
-//	}
-//	
-//	while (true) {
-//			usleep(100);
-//			if ( getNumReadsInFlight() == 0 ) break;
-//	}
-//
+
 	timespec start, now;
 	clock_gettime(CLOCK_REALTIME, & start);
-	int REPEAT=128;
+
 //	//write pages
-//	//FIXME: in old xbsv, simulatneous DMA reads using multiple readers cause kernel panic
-//	//Issue each bus separately for now
 	printf( "TEST WRITE STARTED!\n" ); fflush(stdout);
-	for (int page = 0; page < REPEAT; page++){
-	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-			for (int bus = 0; bus < NUM_BUSES; bus++){
-				//int page = MYPAGE;
-				//fill write memory
-				writePage(bus, chip, blk, page, waitIdleWriteBuffer());
-			}
+	for (int repeat = 0; repeat < REPEAT; repeat++){
+		for (int page = 0; page < PAGES_PER_BLOCK; page++){
+			for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
+				for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+					for (int bus = 0; bus < NUM_BUSES; bus++){
+					//fill write memory
+						writePage(bus, chip, blk, page, waitIdleWriteBuffer());
+					}
+				}
+			} //each bus
 		}
-	} //each bus
 	}
-	
 	while (true) {
 		usleep(100);
 		if ( getNumWritesInFlight() == 0 ) break;
 	}
 	
-//	printf( "FAKE READ STARTED!\n" ); fflush(stdout);
-//		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-//			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-//				for (int bus = 0; bus < NUM_BUSES; bus++){
-//					int page = MYPAGE;
-//					readPage(bus, chip, blk, page, waitIdleReadBuffer());
-//				}
-//			}
-//		}
-//	while (true) {
-//		usleep(100);
-//		if ( getNumReadsInFlight() == 0 ) break;
-//	}
-////
-////
-//	timespec start, now;
-//	clock_gettime(CLOCK_REALTIME, & start);
-//	
-//	int REPEAT=2000;
-//
-//	printf( "TEST READ SINGLE BUS 1 STARTED!\n" ); fflush(stdout);
-//	for (int repeat = 0; repeat < REPEAT; repeat++){
-//		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-//			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-//				for (int bus = 0; bus < NUM_BUSES; bus++){
-//					int page = MYPAGE;
-//					readPage(bus, chip, blk, page, waitIdleReadBuffer());
-//				}
-//			}
-//		}
-//	}
-//	
-//	while (true) {
-//		usleep(100);
-//		if ( getNumReadsInFlight() == 0 ) break;
-//	}
 	
 	clock_gettime(CLOCK_REALTIME, & now);
 	fprintf(stderr, "LOG: finished reading from page! %f\n", timespec_diff_sec(start, now) );
-	fprintf(stderr, "SPEED: %f MB/s\n", (8224.0*NUM_BUSES*CHIPS_PER_BUS*BLOCKS_PER_CHIP*REPEAT/1000000)/timespec_diff_sec(start,now));
-
-	//for (int t = 0; t < NUM_TAGS; t++) {
-	//	for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
-	//		readBuffers[t][i] = 0xDEADBEEF;
-	//	}
-	//}
-
-	//printf( "TEST READ MULTI BUS STARTED!\n" ); fflush(stdout);
-	//for (int repeat = 0; repeat < 1; repeat++){
-	//	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-	//		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-	//			for (int bus = 0; bus < NUM_BUSES; bus++){
-	//				int page = MYPAGE;
-	//				readPage(bus, chip, blk, page, waitIdleReadBuffer());
-	//			}
-	//		}
-	//	}
-	//}
-
-	//while (true) {
-	//	usleep(100);
-	//	if ( getNumReadsInFlight() == 0 ) break;
-	//}
+	fprintf(stderr, "SPEED: %f MB/s\n", (8224.0*PAGES_PER_BLOCK*BLOCKS_PER_CHIP*CHIPS_PER_BUS*NUM_BUSES*REPEAT/1000000)/timespec_diff_sec(start,now));
 
 	int elapsed = 0;
 	while (true) {
@@ -574,11 +492,7 @@ int main(int argc, const char **argv)
 
 
 	sleep(3);
-//	for ( int t = 0; t < NUM_TAGS; t++ ) {
-//		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
-//			fprintf(stderr,  "%d %d %x\n", t, i, writeBuffers[t][i] );
-//		}
-//	}
+
 	printf("testPassed: %d\n",testPassed?1:0);
 	if (testPassed==true) {
 		fprintf(stderr, "LOG: TEST PASSED!\n");

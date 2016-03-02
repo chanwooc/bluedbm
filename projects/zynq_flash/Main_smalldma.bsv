@@ -116,7 +116,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 
 	//Create read/write engines with NUM_BUSES memservers
 	Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_BUSES,NumReadClients))) re <- replicateM(mkMemReadEngine);
-	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  2, TDiv#(NUM_BUSES,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
+	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
 	//MemwriteEngineV#(WordSz, 2, NUM_BUSES) we <- mkMemwriteEngineBuff(1024);
 
 	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_BUSES,NumReadClients))) rengine, Integer idx ) ;
@@ -128,7 +128,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 		return rengine[idx].readServers[0];
 	endfunction
 	
-	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumReadClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumReadClients))) wengine, Integer idx ) ;
+	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_BUSES,NumWriteClients))) wengine, Integer idx ) ;
 		//let numOfMasters = valueOf(NumberOfMasters);
 		//let numBuses = valueOf(NUM_BUSES);
 		

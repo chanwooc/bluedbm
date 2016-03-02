@@ -63,11 +63,10 @@ import IfcNames::*;
 import ConnectalConfig::*;
 
 //(* synthesize *)
-//module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop)
-module mkConnectalTop (ConnectalTop) ;
+module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop) ;
+//module mkConnectalTop (ConnectalTop) ;
 //   provisos (Add#(0,64,DataBusWidth),Add#(4,0,NumberOfMasters));
 
-	
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
 
@@ -75,32 +74,13 @@ module mkConnectalTop (ConnectalTop) ;
 
    FlashIndicationProxy flashIndicationProxy <- mkFlashIndicationProxy(FlashIndicationH2S);
 
-   MainIfc hwmain <- mkMain(flashIndicationProxy.ifc, curClk, curRst);
+   MainIfc hwmain <- mkMain(flashIndicationProxy.ifc, clk200, rst200);
    FlashRequestWrapper flashRequestWrapper <- mkFlashRequestWrapper(FlashRequestS2H,hwmain.request);
 
-   //Vector#(1,  MemReadClient#(DataBusWidth))   readClients = cons(hwmain.dmaReadClient, nil);
-   //Vector#(1, MemWriteClient#(DataBusWidth))  writeClients = cons(hwmain.dmaWriteClient, nil);
    
    let readClients = hwmain.dmaReadClient;
    let writeClients = hwmain.dmaWriteClient;
 
-  /* 
-   MMUIndicationProxy hostMMUIndicationProxy <- mkMMUIndicationProxy(PlatformIfcNames_MMUIndicationH2S);
-   MMU#(PhysAddrWidth) hostMMU <- mkMMU(0, True, hostMMUIndicationProxy.ifc);
-   MMURequestWrapper hostMMURequestWrapper <- mkMMURequestWrapper(PlatformIfcNames_MMURequestS2H, hostMMU.request);
-
-   MemServerIndicationProxy hostMemServerIndicationProxy <- mkMemServerIndicationProxy(PlatformIfcNames_MemServerIndicationH2S);
-   MemServer#(PhysAddrWidth,DataBusWidth,1) dma <- mkMemServer(readClients, writeClients, cons(hostMMU,nil), hostMemServerIndicationProxy.ifc);
-   MemServerRequestWrapper hostMemServerRequestWrapper <- mkMemServerRequestWrapper(PlatformIfcNames_MemServerRequestS2H, dma.request);
-
-   Vector#(6,StdPortal) portals;
-   portals[0] = flashRequestWrapper.portalIfc;
-   portals[1] = flashIndicationProxy.portalIfc; 
-   portals[2] = hostMemServerRequestWrapper.portalIfc;
-   portals[3] = hostMemServerIndicationProxy.portalIfc; 
-   portals[4] = hostMMURequestWrapper.portalIfc;
-   portals[5] = hostMMUIndicationProxy.portalIfc;
-   */
    
    Vector#(2,StdPortal) portals;
    portals[0] = flashRequestWrapper.portalIfc;

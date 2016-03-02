@@ -70,8 +70,8 @@ set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks auroraI_user
 
 #CDC from auroraI_user_clk_i to/from  (200mhz system clk)
 #Warning: The following constraints must be sourced AFTER zc707.xdc!
-set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks auroraI_user_clk_i] -datapath_only 5.0
-set_max_delay -from [get_clocks auroraI_user_clk_i] -to [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -datapath_only 5.0
+set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks auroraI_user_clk_i] -datapath_only [get_property CLKIN1_PERIOD [get_cells ps7_clockGen_pll]]
+set_max_delay -from [get_clocks auroraI_user_clk_i] -to [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -datapath_only [get_property CLKIN1_PERIOD [get_cells ps7_clockGen_pll]]
 
 
 ############################### GT LOC ###################################

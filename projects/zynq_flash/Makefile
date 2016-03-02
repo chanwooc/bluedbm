@@ -18,28 +18,30 @@ BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 
 CPPFILES=main.cpp
 
-CONNECTALFLAGS  = -D DataBusWidth=64
+CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=8 -D NumWriteClients=8
+CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS
+CONNECTALFLAGS += --mainclockperiod=8 --derivedclockperiod=5
 CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
 
 ifeq ($(BOARD), bluesim)
 CONNECTALFLAGS += -D BSIM
-endif
-
-BLUEDBM_XDC = ../../misc/nohost.xdc
+else
+NOHOST_XDC = ../../misc/nohost.xdc
 
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/aurora_8b10b_zynq/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci \
 	--constraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
-	--constraint $(BLUEDBM_XDC) \
+	--constraint $(NOHOST_XDC) \
 	--implconstraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
-	--implconstraint $(BLUEDBM_XDC) 
+	--implconstraint $(NOHOST_XDC) 
 
 AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq_stub.v
 prebuild:: $(AURORA_INTRA)
 
-$(AURORA_INTRA):
+$(AURORA_INTRA): ../../core-scripts/synth-aurora-intra-zynq.tcl
 	(cd $(BOARD); vivado -mode batch -source ../../../core-scripts/synth-aurora-intra-zynq.tcl)
+endif
 
 include $(CONNECTALDIR)/Makefile.connectal
