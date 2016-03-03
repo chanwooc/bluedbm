@@ -34,6 +34,7 @@ bool g_checkdata = true;
 unsigned int* readBuffers[NUM_TAGS];
 unsigned int* writeBuffers[NUM_TAGS];
 FlashRequestProxy *device;
+FlashIndication *deviceIndication;
 
 
 //extern FlashRequestProxy *g_device;
@@ -91,7 +92,7 @@ void local_test(bool check, int read_repeat, int debug_lvl ) {
 				int freeTag = waitIdleWriteBuffer();
 				if (g_checkdata) {
 					//fill write memory only if we're doing readback checks
-					for (unsigned int w=0; w<PAGE_SIZE/sizeof(unsigned int); w++) {
+					for (unsigned int w=0; w<FPAGE_SIZE/sizeof(unsigned int); w++) {
 						writeBuffers[freeTag][w] = hashAddrToData(node, bus, chip, blk, w);
 					}
 				}
@@ -140,7 +141,7 @@ void local_test(bool check, int read_repeat, int debug_lvl ) {
 	sleep(1);
 
 	for ( int t = 0; t < NUM_TAGS; t++ ) {
-		for ( unsigned int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
+		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
 			LOG(1, "%x %x %x\n", t, i, readBuffers[t][i] );
 		}
 	}
@@ -225,7 +226,7 @@ void one_to_many_test(bool check, int read_repeat, int debug_lvl, int accessNode
 					int freeTag = waitIdleWriteBuffer();
 					if (g_checkdata) {
 						//fill write memory only if we're doing readback checks
-						for (unsigned int w=0; w<PAGE_SIZE/sizeof(unsigned int); w++) {
+						for (unsigned int w=0; w<FPAGE_SIZE/sizeof(unsigned int); w++) {
 							writeBuffers[freeTag][w] = hashAddrToData(node, bus, chip, blk, w);
 						}
 					}
@@ -277,7 +278,7 @@ void one_to_many_test(bool check, int read_repeat, int debug_lvl, int accessNode
 	sleep(1);
 
 	for ( int t = 0; t < NUM_TAGS; t++ ) {
-		for ( unsigned int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
+		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
 			LOG(1, "%x %x %x\n", t, i, readBuffers[t][i] );
 		}
 	}
@@ -363,7 +364,7 @@ void many_to_many_test(bool check, int test_repeat, int read_repeat, int debug_l
 						int freeTag = waitIdleWriteBuffer();
 						if (g_checkdata) {
 							//fill write memory only if we're doing readback checks
-							for (unsigned int w=0; w<PAGE_SIZE/sizeof(unsigned int); w++) {
+							for (unsigned int w=0; w<FPAGE_SIZE/sizeof(unsigned int); w++) {
 								writeBuffers[freeTag][w] = hashAddrToData(node, bus, chip, blk, w);
 							}
 						}
@@ -417,7 +418,7 @@ void many_to_many_test(bool check, int test_repeat, int read_repeat, int debug_l
 	sleep(1);
 
 	for ( int t = 0; t < NUM_TAGS; t++ ) {
-		for ( unsigned int i = 0; i < PAGE_SIZE/sizeof(unsigned int); i++ ) {
+		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
 			LOG(1, "%x %x %x\n", t, i, readBuffers[t][i] );
 		}
 	}
@@ -443,20 +444,27 @@ int main(int argc, const char **argv)
 	char hostname[32];
 	gethostname(hostname,32);
 
-	char* userhostid = getenv("BDBM_ID");
-	if ( userhostid != NULL ) {
-		myid = atoi(userhostid);
-	} else {
+	myid = atoi(hostname+strlen("nohost"));
+	
+	if ( strstr(hostname, "nohost") != NULL ) {
+		myid = atoi(hostname+strlen("nohost"));
+	}else if( strstr(hostname, "bdbm") != NULL ) {
 		myid = atoi(hostname+strlen("bdbm"));
-		if ( strstr(hostname, "bdbm") == NULL ) {
-			myid = 1;
-		}
+	} else {
+		myid = 1;
 	}
 
 	fprintf(stderr, "Main: myid=%d\n", myid);
 
 	init_dma();
 
+
+	long actualFrequency=0;
+	long requestedFrequency=1e9/MainClockPeriod;
+	int status = setClockFrequency(0, requestedFrequency, &actualFrequency);
+	fprintf(stderr, "Requested Freq: %5.2f, Actual Freq: %5.2f, status=%d\n"
+			,(double)requestedFrequency*1.0e-6
+			,(double)actualFrequency*1.0e-6,status);
 
 	//Start ext aurora
 	auroraifc_start(myid);
@@ -483,7 +491,7 @@ int main(int argc, const char **argv)
 
 	
 	//void many_to_many_test(bool check, int test_repeat, int read_repeat, int debug_lvl)
-	many_to_many_test(true, 1, 10, 5);
+//	many_to_many_test(true, 1, 10, 5);
 
 
 }

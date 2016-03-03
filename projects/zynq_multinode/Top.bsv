@@ -65,11 +65,9 @@ import IfcNames::*;
 import ConnectalConfig::*;
 
 //(* synthesize *)
-//module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop)
-module mkConnectalTop (ConnectalTop) ;
-//   provisos (Add#(0,64,DataBusWidth),Add#(4,0,NumberOfMasters));
+module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop) ;
+//module mkConnectalTop (ConnectalTop) ;
 
-	
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
 
@@ -77,7 +75,7 @@ module mkConnectalTop (ConnectalTop) ;
 
 	FlashIndicationProxy flashIndicationProxy <- mkFlashIndicationProxy(FlashIndicationH2S);
 
-	MainIfc hwmain <- mkMain(flashIndicationProxy.ifc, curClk, curRst);
+	MainIfc hwmain <- mkMain(flashIndicationProxy.ifc, clk200, rst200);
 	FlashRequestWrapper flashRequestWrapper <- mkFlashRequestWrapper(FlashRequestS2H,hwmain.request);
    
 	let readClients = hwmain.dmaReadClient;

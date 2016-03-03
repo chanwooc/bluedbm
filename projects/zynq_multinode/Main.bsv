@@ -44,8 +44,6 @@ import Xilinx       :: *;
 import XilinxCells ::*;
 `endif
 
-import ControllerTypes::*;
-
 import AuroraCommon::*;
 import AuroraImportZynq::*;
 
@@ -64,14 +62,12 @@ import BRAMFIFOVector::*;
 import FlashSplitter::*;
 
 interface FlashRequest;
-	// "node" argument added
 	method Action readPage(Bit#(32) node, Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) page, Bit#(32) tag);
 	method Action writePage(Bit#(32) node, Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) page, Bit#(32) tag);
 	method Action eraseBlock(Bit#(32) node, Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) tag);
 	//method Action addDmaReadRefs(Bit#(32) pointer, Bit#(32) offset, Bit#(32) tag);
 	//method Action addDmaWriteRefs(Bit#(32) pointer, Bit#(32) offset, Bit#(32) tag);
 
-	// instead of above?
 	method Action setDmaReadRef(Bit#(32) sgId);
 	method Action setDmaWriteRef(Bit#(32) sgId);
 	
@@ -79,7 +75,7 @@ interface FlashRequest;
 	method Action debugDumpReq(Bit#(32) dummy);
 	method Action setDebugVals (Bit#(32) flag, Bit#(32) debugDelay); 
 	
-	// added for multinode
+	// AuroraExt
 	method Action setAuroraExtRoutingTable(Bit#(32) node, Bit#(32) portidx, Bit#(32) portsel);
 	method Action setNetId(Bit#(32) netid);
 	method Action auroraStatus(Bit#(32) dummy);
@@ -91,14 +87,11 @@ interface FlashIndication;
 	method Action eraseDone(Bit#(32) tag, Bit#(32) status);
 	method Action debugDumpResp(Bit#(32) debug0, Bit#(32) debug1, Bit#(32) debug2, Bit#(32) debug3, Bit#(32) debug4, Bit#(32) debug5);
 	
-	// added for multinode
+	// AuroraExt
 	method Action hexDump(Bit#(32) hex);
 	method Action debugAuroraExt(Bit#(32) debug0, Bit#(32) debug1, Bit#(32) debug2, Bit#(32) debug3);
 endinterface
 
-// NumDmaChannels each for flash i/o and emualted i/o
-//typedef TAdd#(NumDmaChannels, NumDmaChannels) NumObjectClients;
-//typedef NumDmaChannels NumObjectClients;
 typedef 128 DmaBurstBytes; 
 Integer dmaBurstBytes = valueOf(DmaBurstBytes);
 Integer dmaBurstWords = dmaBurstBytes/wordBytes; //128/16 = 8
@@ -118,12 +111,12 @@ interface MainIfc;
 	interface Aurora_Pins#(4) aurora_fmc1;
 	interface Aurora_Clock_Pins aurora_clk_fmc1;
 
-	// for ext aurora
+	// for AuroraExt
 	interface Vector#(AuroraExtPerQuad, Aurora_Pins#(1)) aurora_ext;
 	interface Aurora_Clock_Pins aurora_quad109; // zynq, it is conneted to quad109
 endinterface
 
-// for multinode
+// Multinode
 (* synthesize *)
 module mkBRAMFIFOVectorSynth(BRAMFIFOVectorIfc#(TLog#(TAGS_PER_PORT), 12, Tuple2#(Bit#(WordSz), TagT)));
 	BRAMFIFOVectorIfc#(TLog#(TAGS_PER_PORT), 12, Tuple2#(Bit#(WordSz), TagT)) bramFifoVec <- mkBRAMFIFOVector(dmaBurstWords, pageWords, pagePadCnt);
@@ -140,6 +133,16 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 
 
 	//--------------------------------------------
+	// Flash Controller Instantiation
+	//--------------------------------------------
+	GtxClockImportIfc gtx_clk_fmc1 <- mkGtxClockImport;
+	`ifdef BSIM
+		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlModel(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
+	`else
+		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlZynq(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
+	`endif
+
+	//--------------------------------------------
 	// DMA Module Instantiation
 	//--------------------------------------------
 	Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_ENG_PORTS,NumReadClients))) re <- replicateM(mkMemReadEngine);
@@ -147,7 +150,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 
 	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_ENG_PORTS,NumReadClients))) rengine, Integer idx ) ;
 		//let numOfMasters = valueOf(NumberOfMasters);
-		//let numBuses = valueOf(NUM_BUSES);
+		//let numBuses = valueOf(NUM_ENG_PORTS);
 		
 		//return rengine[idx/2].readServers[idx%2];
 		//return rengine[0].readServers[idx];
@@ -156,7 +159,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	
 	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) wengine, Integer idx ) ;
 		//let numOfMasters = valueOf(NumberOfMasters);
-		//let numBuses = valueOf(NUM_BUSES);
+		//let numBuses = valueOf(NUM_ENG_PORTS);
 		
 		//return wengine[idx/2].writeServers[idx%2];
 		//return wengine[0].writeServers[idx];
@@ -280,44 +283,12 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	//--------------------------------------------
 	FIFO#(FlashCmdRoute) flashCmdQ <- mkSizedFIFO(valueOf(NumTags));
 	
-	GtxClockImportIfc gtx_clk_fmc1 <- mkGtxClockImport;
-	`ifdef BSIM
-		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlModel(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
-	`else
-		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlZynq(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
-	`endif
 
 	rule incCycle;
 		cycleCnt <= cycleCnt + 1;
 	endrule
 
-//	Vector#(NumTags, Reg#(BusT)) tag2busTable <- replicateM(mkRegU());
-//	Vector#(NumTags, Reg#(Tuple2#(Bit#(32),Bit#(32)))) dmaWriteRefs <- replicateM(mkRegU());
-//	Vector#(NumTags, Reg#(Tuple2#(Bit#(32),Bit#(32)))) dmaReadRefs <- replicateM(mkRegU());
-//	Vector#(NUM_BUSES, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBuf <- replicateM(mkSizedBRAMFIFO(dmaBurstWords*2));
-//	Vector#(NUM_BUSES, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBufOut <- replicateM(mkFIFO());
-//
-//
-//
-//	Vector#(NUM_BUSES, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));
-//	Vector#(NUM_BUSES, Reg#(Bit#(16))) dmaWBurstPerPageCnts <- replicateM(mkReg(0));
-//	Vector#(NUM_BUSES, FIFO#(TagT)) dmaReqQs <- replicateM(mkSizedFIFO(valueOf(NumTags)));//TODO make bigger?
-//	Vector#(NUM_BUSES, FIFO#(TagT)) dmaReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO make bigger?
-////	Vector#(NUM_BUSES, Reg#(Bit#(32))) dmaWrReqCnts <- replicateM(mkReg(0));
-//	Vector#(NUM_BUSES, Reg#(TagT)) currTags <- replicateM(mkReg(0));
-//	FIFO#(Tuple2#(Bit#(WordSz), TagT)) dataFlash2DmaQ <- mkFIFO();
-//	Vector#(NUM_BUSES, FIFO#(TagT)) dmaReadDoneQs <- replicateM(mkFIFO);
-//
-//	rule driveFlashCmd (started);
-//		let cmd = flashCmdQ.first;
-//		flashCmdQ.deq;
-//		tag2busTable[cmd.tag] <= cmd.bus;
-//		flashCtrl.user.sendCmd(cmd); //forward cmd to flash ctrl
-//		$display("@%d: Main.bsv: received cmd tag=%d @%x %x %x %x", 
-//						cycleCnt, cmd.tag, cmd.bus, cmd.chip, cmd.block, cmd.page);
-//	endrule
-
-	rule flashCmdForward if (started);
+	rule flashCmdForward (started);
 		let cmdRt = flashCmdQ.first;
 		flashCmdQ.deq;
 		flashSplit.locFlashServ.sendCmd.put(cmdRt);
@@ -377,7 +348,6 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 			debugReadCnt <= debugReadCnt + 1;
 			if (debugFlag==0) begin
 				flashSplit.locFlashCli.readWord.put(tuple3(data, tag, ?));
-				//dataFlash2DmaQ.enq(taggedRdata);
 			end
 			delayReg <= truncate(delayRegSet);
 		end
@@ -470,10 +440,10 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	// Writes to Flash (DMA Reads)
 	//--------------------------------------------
 //	FIFO#(Tuple2#(TagT, BusT)) wrToDmaReqQ <- mkFIFO();
-//	Vector#(NUM_BUSES, FIFO#(TagT)) dmaRdReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO sz
-//	Vector#(NUM_BUSES, Reg#(Bit#(32))) dmaReadBurstCount <- replicateM(mkReg(0));
-//	Vector#(NUM_BUSES, FIFO#(TagT)) dmaReadReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));
-//	//Vector#(NUM_BUSES, Reg#(Bit#(32))) dmaRdReqCnts <- replicateM(mkReg(0));
+//	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaRdReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO sz
+//	Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) dmaReadBurstCount <- replicateM(mkReg(0));
+//	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaReadReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));
+//	//Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) dmaRdReqCnts <- replicateM(mkReg(0));
 	Reg#(Bit#(32)) dmaReadSgid <- mkReg(0);
 	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(TagT, HeaderField))) dmaRdReq2RespQ <- replicateM(mkSizedFIFO(4)); //TODO sz
 	Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) dmaReadBurstCount <- replicateM(mkReg(0));
@@ -530,7 +500,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 			end
 		endrule
 
-		//64->128 (Zynq)
+		//forward data: 64->128 (Zynq)
 		Reg#(Bit#(1)) phaseR <- mkReg(0);
 		Reg#(Bit#(WordSz)) dataTmp <- mkReg(0);
 		FIFO#(Bit#(WordSz)) rdDataPipe <- mkFIFO;
@@ -547,7 +517,6 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 			end
 		endrule
 
-		//forward data
 		FIFO#(Tuple3#(Bit#(128), TagT, HeaderField)) writeWordPipe <- mkFIFO();
 		rule pipeDmaRdData;
 			let d = rdDataPipe.first;
@@ -574,8 +543,8 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 
 		rule forwardDmaRdData;
 			writeWordPipe.deq;
-			debugWriteCnt <= debugWriteCnt + 1;
 			flashSplit.locFlashServ.writeWord.put(writeWordPipe.first);
+			debugWriteCnt <= debugWriteCnt + 1;
 		endrule
 	end //for each eng_port
 	
@@ -613,10 +582,10 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 		endcase
 	endrule
 
+
 	//--------------------------------------------
 	// Debug
 	//--------------------------------------------
-
 	FIFO#(Bit#(1)) debugReqQ <- mkFIFO();
 	rule doDebugDump;
 		$display("Main.bsv: debug dump request received");
@@ -628,8 +597,6 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 		let auroraRecCntCC = tpl_4(debugCnts);  
 		indication.debugDumpResp(gearboxSendCnt, gearboxRecCnt, auroraSendCntCC, auroraRecCntCC, debugReadCnt, debugWriteCnt);
 	endrule
-
-
 	
 	Vector#(NumWriteClients, MemWriteClient#(DataBusWidth)) dmaWriteClientVec; // = vec(we.dmaClient); 
 	Vector#(NumReadClients, MemReadClient#(DataBusWidth)) dmaReadClientVec;
@@ -665,6 +632,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 				block: truncate(block),
 				page: truncate(page)
 				};
+
 			flashCmdQ.enq(FlashCmdRoute{srcNode: myNodeId, dstNode: truncate(node), fcmd: fcmd});
 		endmethod
 
@@ -677,11 +645,11 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 				block: truncate(block),
 				page: 0
 				};
+
 			flashCmdQ.enq(FlashCmdRoute{srcNode: myNodeId, dstNode: truncate(node), fcmd: fcmd});
 		endmethod
 
 		method Action setDmaReadRef(Bit#(32) sgId);
-			//dmaReadRefs[tag] <= tuple2(pointer, offset);
 			dmaReadSgid <= sgId;
 		endmethod
 
@@ -734,4 +702,3 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	interface aurora_ext = auroraExt109.aurora;
 	interface aurora_quad109 = gtx_clk_109.aurora_clk;
 endmodule
-

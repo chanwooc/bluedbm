@@ -288,4 +288,3 @@ module mkFlashSplitter(FlashSplitterIfc);
 		myNodeId <= myId;
 	endmethod
 endmodule
-

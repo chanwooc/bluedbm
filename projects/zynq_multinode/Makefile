@@ -18,12 +18,15 @@ BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 	../../controller/src/model_zynq/FlashCtrlModel.bsv \
 	../../controller/src/hw_zynq/FlashCtrlZynq.bsv
 
-CPPFILES=main.cpp flash.cpp flash.h
+CPPFILES=main.cpp flash.cpp #flash.h
 
-CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NodeCountLog=2
+CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=8 -D NumWriteClients=8
+CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS
+CONNECTALFLAGS += --mainclockperiod=8 --derivedclockperiod=5
 CONNECTALFLAGS += --bsvpath=$(BOARD)/generatedbsv
+CONNECTALFLAGS += --cflags="-Wno-error=unused-variable"
 
 ifeq ($(BOARD), bluesim)
 CONNECTALFLAGS += -D BSIM

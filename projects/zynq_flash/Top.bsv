@@ -65,43 +65,37 @@ import ConnectalConfig::*;
 //(* synthesize *)
 module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop) ;
 //module mkConnectalTop (ConnectalTop) ;
-//   provisos (Add#(0,64,DataBusWidth),Add#(4,0,NumberOfMasters));
 
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
 
 	/////////////////////////////////////////
 
-   FlashIndicationProxy flashIndicationProxy <- mkFlashIndicationProxy(FlashIndicationH2S);
+	FlashIndicationProxy flashIndicationProxy <- mkFlashIndicationProxy(FlashIndicationH2S);
 
-   MainIfc hwmain <- mkMain(flashIndicationProxy.ifc, clk200, rst200);
-   FlashRequestWrapper flashRequestWrapper <- mkFlashRequestWrapper(FlashRequestS2H,hwmain.request);
-
+	MainIfc hwmain <- mkMain(flashIndicationProxy.ifc, clk200, rst200);
+	FlashRequestWrapper flashRequestWrapper <- mkFlashRequestWrapper(FlashRequestS2H,hwmain.request);
    
-   let readClients = hwmain.dmaReadClient;
-   let writeClients = hwmain.dmaWriteClient;
-
+	let readClients = hwmain.dmaReadClient;
+	let writeClients = hwmain.dmaWriteClient;
    
-   Vector#(2,StdPortal) portals;
-   portals[0] = flashRequestWrapper.portalIfc;
-   portals[1] = flashIndicationProxy.portalIfc; 
+	Vector#(2,StdPortal) portals;
+	portals[0] = flashRequestWrapper.portalIfc;
+	portals[1] = flashIndicationProxy.portalIfc; 
 
-   let ctrl_mux <- mkSlaveMux(portals);
+	let ctrl_mux <- mkSlaveMux(portals);
    
-//   interface masters = dma.masters;
-
 	Vector#(NumWriteClients,MemWriteClient#(DataBusWidth)) nullWriters = replicate(null_mem_write_client());
 	Vector#(NumReadClients,MemReadClient#(DataBusWidth)) nullReaders = replicate(null_mem_read_client());
 
-
 	interface readers = take(append(readClients, nullReaders));
 	interface writers = take(append(writeClients, nullWriters));
-   interface interrupt = getInterruptVector(portals);
-   interface slave = ctrl_mux;
+	interface interrupt = getInterruptVector(portals);
+	interface slave = ctrl_mux;
 
 	interface Top_Pins pins;
-		interface Aurora_Pins aurora_fmc1 = hwmain.aurora_fmc1;
-		interface Aurora_Clock_Pins aurora_clk_fmc1 = hwmain.aurora_clk_fmc1;
+		interface aurora_fmc1 = hwmain.aurora_fmc1;
+		interface aurora_clk_fmc1 = hwmain.aurora_clk_fmc1;
 	endinterface
 endmodule
 

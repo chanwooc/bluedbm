@@ -46,6 +46,18 @@ void LOG(int lvl, const char *format, ...) {
 //---------------------------------
 //Indication callback handlers
 //---------------------------------
+void FlashIndication::debugDumpResp (unsigned int debug0, unsigned int debug1,  unsigned int debug2, unsigned int debug3, unsigned int debug4, unsigned int debug5) {
+	LOG(0, "LOG: DEBUG DUMP: gearSend = %d, gearRec = %d, aurSend = %d, aurRec = %d, readSend=%d, writeSend=%d\n", debug0, debug1, debug2, debug3, debug4, debug5);
+}
+
+void FlashIndication::debugAuroraExt(unsigned int debug0, unsigned int debug1, unsigned int debug2, unsigned int debug3) {
+	LOG(0, "LOG: Aurora Ext: cmdHi = %x, cmdLo = %x\n", debug0, debug1);
+}
+
+void FlashIndication::hexDump(unsigned int hex) {
+	LOG(0, "LOG: hexDump=%x\n", hex);
+}
+
 void FlashIndication::readDone(unsigned int tag) {
 	LOG(1, "LOG: pagedone: tag=%d; inflight=%d\n", tag, curReadsInFlight );
 
@@ -123,18 +135,14 @@ void auroraifc_start(int id) {
 
 
 void init_dma() {
-	//MemServerRequestProxy *hostMemServerRequest = new MemServerRequestProxy(HostMemServerRequestS2H);
-	//MMURequestProxy *dmap = new MMURequestProxy(HostMMURequestS2H);
-	//DmaManager *dma = new DmaManager(dmap);
-	//MemServerIndication hostMemServerIndication(hostMemServerRequest, HostMemServerIndicationH2S);
-	//MMUIndication hostMMUIndication(dma, HostMMUIndicationH2S);
+
+	fprintf(stderr, "Initializing DMA...\n");
+	device = new FlashRequestProxy(FlashRequestS2H);
+	deviceIndication = new FlashIndication(FlashIndicationH2S);
+	DmaManager *dma = platformInit();
 
 	fprintf(stderr, "Main::allocating memory...\n");
 
-	device = new FlashRequestProxy(FlashRequestS2H);
-	FlashIndication deviceIndication(FlashIndicationH2S);
-	DmaManager *dma = platformInit();
-	
 	srcAlloc = portalAlloc(srcAlloc_sz, 0);
 	dstAlloc = portalAlloc(dstAlloc_sz, 0);
 	srcBuffer = (unsigned int *)portalMmap(srcAlloc, srcAlloc_sz);

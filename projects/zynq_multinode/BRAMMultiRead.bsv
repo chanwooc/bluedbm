@@ -1,7 +1,6 @@
 import BRAM::*;
 import Vector::*;
 
-
 //1 write, N read port BRAM via replication
 
 interface BRAMMultiRead#(type addr, type data, numeric type nreadPorts);
@@ -32,4 +31,3 @@ module mkBRAMMultiRead#(BRAM_Configure cfg) (BRAMMultiRead#(addr, data, nreadPor
 		interface response = ?;
 	endinterface
 endmodule
-
