@@ -18,7 +18,7 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define BLOCKS_PER_CHIP 4
+#define BLOCKS_PER_CHIP 32
 #define CHIPS_PER_BUS 8 // 8
 #define NUM_BUSES 8 // 8
 

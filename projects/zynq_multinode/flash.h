@@ -14,7 +14,7 @@
 #include "FlashRequest.h"
 
 #define PAGES_PER_BLOCK 1
-#define BLOCKS_PER_CHIP 128//1024  //Be careful when using this during concurrent write test
+#define BLOCKS_PER_CHIP 32//1024  //Be careful when using this during concurrent write test
 #define CHIPS_PER_BUS 8
 #define NUM_BUSES 8
 #define NUM_NODES 2

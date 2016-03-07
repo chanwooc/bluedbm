@@ -105,6 +105,7 @@ void local_test(bool check, int read_repeat, int debug_lvl ) {
 	while (true) {
 		if ( getNumWritesInFlight() == 0 ) break;
 	}
+
 	clock_gettime(CLOCK_REALTIME, & now);
 	timeElapsed = timespec_diff_sec(start, now);
 	bw = (pagesWritten*8)/timeElapsed/1024; //MB/s
@@ -140,11 +141,11 @@ void local_test(bool check, int read_repeat, int debug_lvl ) {
 	device->debugDumpReq(0);
 	sleep(1);
 
-	for ( int t = 0; t < NUM_TAGS; t++ ) {
-		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
-			LOG(1, "%x %x %x\n", t, i, readBuffers[t][i] );
-		}
-	}
+//	for ( int t = 0; t < NUM_TAGS; t++ ) {
+//		for ( unsigned int i = 0; i < FPAGE_SIZE/sizeof(unsigned int); i++ ) {
+//			LOG(1, "%x %x %x\n", t, i, readBuffers[t][i] );
+//		}
+//	}
 
 	if (g_checkdata) {
 		if (g_testpass) {
@@ -439,22 +440,24 @@ void many_to_many_test(bool check, int test_repeat, int read_repeat, int debug_l
 
 int main(int argc, const char **argv)
 {
-
-	//Getting my ID
 	char hostname[32];
-	gethostname(hostname,32);
-
-	myid = atoi(hostname+strlen("nohost"));
 	
-	if ( strstr(hostname, "nohost") != NULL ) {
-		myid = atoi(hostname+strlen("nohost"));
-	}else if( strstr(hostname, "bdbm") != NULL ) {
-		myid = atoi(hostname+strlen("bdbm"));
+	//Getting my ID
+	if (argc >= 3) {
+		strncpy(hostname, argv[1], 32);
+		myid = atoi(argv[1]);
 	} else {
-		myid = 1;
+		gethostname(hostname, 32);
+		if ( strstr(hostname, "nohost") != NULL ) {
+			myid = atoi(hostname+strlen("nohost"));
+		} else if( strstr(hostname, "bdbm") != NULL ) {
+			myid = atoi(hostname+strlen("bdbm"));
+		} else {
+			myid = 1;
+		}
 	}
 
-	fprintf(stderr, "Main: myid=%d\n", myid);
+	fprintf(stderr, "Main: hostname=%s myid=%d\n", hostname, myid);
 
 	init_dma();
 
@@ -478,17 +481,14 @@ int main(int argc, const char **argv)
 	sleep(1);
 
 	//void local_test(bool check, int read_repeat, int debug_lvl )
-	local_test(true, 1, 5);
-	LOG(0, "Press any key to continue..\n");
+//	local_test(true, 1, 5);
+//	LOG(0, "Press any key to continue..\n");
 	//gets(str);
 
-	/*
 	//void one_to_many_test(bool check, int read_repeat, int debug_lvl, int accessNode)
 	one_to_many_test(true, 1, 5, 1);
 	LOG(0, "Press any key to continue..\n");
-	gets(str);
-	*/
-
+//	gets(str);
 	
 	//void many_to_many_test(bool check, int test_repeat, int read_repeat, int debug_lvl)
 //	many_to_many_test(true, 1, 10, 5);

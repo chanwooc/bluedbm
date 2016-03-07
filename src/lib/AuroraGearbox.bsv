@@ -17,8 +17,11 @@ interface AuroraGearboxIfc;
 
 	method Action auroraRecv(Bit#(AuroraWidth) word);
 	method ActionValue#(Bit#(AuroraWidth)) auroraSend;
+
+	method Bit#(16) curSendBudget;
 endinterface
 
+(* synthesize *)
 module mkAuroraGearbox#(Clock aclk, Reset arst) (AuroraGearboxIfc);
 	SyncFIFOIfc#(Tuple2#(DataIfc,PacketType)) sendQ <- mkSyncFIFOFromCC(4, aclk);
 
@@ -144,5 +147,7 @@ module mkAuroraGearbox#(Clock aclk, Reset arst) (AuroraGearboxIfc);
 		//end
 		return sendData;
 	endmethod
-	
+	method Bit#(16) curSendBudget;
+		return curSendBudgetUp - curSendBudgetDown;
+	endmethod
 endmodule

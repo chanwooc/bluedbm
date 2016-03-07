@@ -81,7 +81,7 @@ void FlashIndication::readDone(unsigned int tag) {
 }
 
 void FlashIndication::writeDone(unsigned int tag) {
-	LOG(1, "LOG: writedone, tag=%d\n", tag);
+	LOG(1, "LOG: writeDone, tag=%d, inflight=%d\n", tag, curWritesInFlight);
 	
 	pthread_mutex_lock(&flashReqMutex);
 	curWritesInFlight--;
@@ -98,7 +98,7 @@ void FlashIndication::writeDone(unsigned int tag) {
 }
 
 void FlashIndication::eraseDone(unsigned int tag, unsigned int status) {
-	LOG(1, "LOG: eraseDone, tag=%d, status=%d\n", tag, status);
+	LOG(1, "LOG: eraseDone, tag=%d, status=%d, inflight=%d\n", tag, status, curErasesInFlight);
 	pthread_mutex_lock(&flashReqMutex);
 	if (status != 0) {
 		TagTableEntry e = eraseTagTable[tag];
@@ -296,6 +296,7 @@ int waitIdleReadBuffer() {
 	while ( tag < 0 ) {
 		pthread_mutex_lock(&flashReqMutex);
 		for ( int t = 0; t < NUM_TAGS; t++ ) { 
+			//LOG(0, "readTagTable[%d].busy = %d!!\n",t, readTagTable[t].busy);
 			if ( !readTagTable[t].busy ) {
 				readTagTable[t].busy = true;
 				tag = t;

@@ -1,15 +1,5 @@
 package AuroraCommon;
 
-/*
-export Aurora_Pins(..);
-export AuroraExtImportIfc(..);
-export AuroraControllerIfc(..);
-
-export Aurora_Clock_Pins;
-export mkGtxClockImport, GtxClockImportIfc::*;
-
-export AuroraImportIfc(..);
-*/
 
 import FIFO::*;
 import Clocks :: *;
@@ -20,7 +10,7 @@ import ConnectalXilinxCells::*;
 import ConnectalClocks::*;
 
 typedef 2 AuroraExtCount;
-//typedef 4 AuroraExtQuad;
+//typedef 4 AuroraExtQuad; // defined in zynq_multinode (?)
 
 `ifndef BSIM
 (* always_enabled, always_ready *)
@@ -141,10 +131,4 @@ module mkGtxClockImport (GtxClockImportIfc);
 	interface Clock gtx_clk_n_ifc = clk;
 `endif
 endmodule
-
-
-
-
-
-
 endpackage: AuroraCommon
