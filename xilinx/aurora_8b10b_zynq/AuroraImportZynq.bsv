@@ -28,6 +28,8 @@ interface AuroraIfc;
 	
 	(* prefix = "" *)
 	interface Aurora_Pins#(4) aurora;
+
+	method Bit#(16) curSendBudget;
 endinterface
 
 (* synthesize *)
@@ -42,15 +44,30 @@ module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (AuroraIfc
 	Reset defaultReset <- exposeCurrentReset;
 	Clock clk50 = auroraIntraClockDiv4.slowClock;
 	Reset rst50 <- mkAsyncReset(2, defaultReset, clk50);
+
 	Clock fmc1_gtx_clk_i <- mkClockIBUFDS_GTE2(
 `ifdef ClockDefaultParam
 						   defaultValue,
 `endif
 						   True, gtx_clk_p, gtx_clk_n);
 
-	MakeResetIfc rstgtxifc <- mkReset(8, True, fmc1_gtx_clk_i);
-        Reset rstgtx = rstgtxifc.new_rst;
+	MakeResetIfc rstgtxifc <- mkReset(16384, True, clk50);
+    Reset rstgtx = rstgtxifc.new_rst;
+	Reset rstgtx_a <- mkAsyncReset(2, rstgtx, clk50);
+
 	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_zynq(fmc1_gtx_clk_i, clk50, rst50, rstgtx);
+
+	Reg#(Bit#(32)) auroraResetCounter <- mkReg(0); //, clocked_by clk50, reset_by rst50ifc.new_rst);
+	rule resetAurora;
+		if ( auroraResetCounter < 1024*1024*512 ) begin
+			auroraResetCounter <= auroraResetCounter +1 ;
+			if ( auroraResetCounter < 1024*1024*128 && auroraIntraImport.user.channel_up == 0 ) begin
+				rstgtxifc.assertReset;
+			end
+		end else begin
+			auroraResetCounter <= 0;
+		end
+	endrule
 `else
 	//Clock gtx_clk = cur_clk;
 	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_bsim;
@@ -73,8 +90,20 @@ module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (AuroraIfc
 	endrule
 
 
+	Reg#(Bit#(32)) auroraInitCnt <- mkReg(0, clocked_by aclk, reset_by arst);
+`ifndef BSIM
+	Integer auroraInitWait = 1024*1024*512;
+`else
+	Integer auroraInitWait = 512;
+`endif
+
 	AuroraGearboxIfc auroraGearbox <- mkAuroraGearbox(aclk, arst);
-	rule auroraOut if (auroraIntraImport.user.channel_up==1);
+
+	rule auroraInit ( auroraInitCnt < fromInteger(auroraInitWait) );
+		auroraInitCnt <= auroraInitCnt + 1;
+	endrule
+
+	rule auroraOut if (auroraIntraImport.user.channel_up==1 && auroraInitCnt >= fromInteger(auroraInitWait));
 		let d <- auroraGearbox.auroraSend;
 		//if ( auroraIntraImport.user.channel_up == 1 ) begin
 			$display("Gearbox send out: %x", d);
@@ -82,29 +111,45 @@ module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (AuroraIfc
 			auroraIntraImport.user.send(d);
 		//end
 	endrule
+
 	/*
 	rule resetDeadLink ( auroraIntraImport.user.channel_up == 0 );
 		auroraGearbox.resetLink;
 		$display("Gearbox reset link");
 	endrule
 	*/
-	rule auroraIn;
+
+	FIFO#(Bit#(AuroraWidth)) auroraRecvQ <- mkSizedFIFO(8, clocked_by aclk, reset_by arst);
+	rule auroraR;
 		let d <- auroraIntraImport.user.receive;
+		Bit#(8) header = truncate(d>>valueOf(BodySz));
+		Bit#(1) idx = header[7];
+		Bit#(1) control = header[6];
+		if ( auroraInitCnt >= fromInteger(auroraInitWait) || control == 1 ) begin
+			auroraRecvQ.enq(d);
+		end
+	endrule
+
+	rule auroraIn( auroraInitCnt >= fromInteger(auroraInitWait));
+		let d = auroraRecvQ.first;
+		auroraRecvQ.deq;
+
 		$display("Gearbox received: %x", d);
 		auroraRecCnt <= auroraRecCnt + 1;
 		auroraGearbox.auroraRecv(d);
 	endrule
-		
+
+	ReadOnly#(Bit#(16)) aSendB <- mkNullCrossingWire(noClock, auroraGearbox.curSendBudget);
 
 	method Tuple4#(Bit#(32), Bit#(32), Bit#(32), Bit#(32)) getDebugCnts;
 		return tuple4(gearboxSendCnt, gearboxRecCnt, auroraSendCntCC, auroraRecCntCC);
 	endmethod
 
-
 	method Action send(DataIfc data, PacketType ptype);
 		auroraGearbox.send(data, ptype);
 		gearboxSendCnt <= gearboxSendCnt + 1;
 	endmethod
+
 	method ActionValue#(Tuple2#(DataIfc, PacketType)) receive;
 		let d <- auroraGearbox.recv;
 		gearboxRecCnt <= gearboxRecCnt + 1;
@@ -121,6 +166,9 @@ module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (AuroraIfc
 	interface Reset rst = auroraIntraImport.aurora_rst;
 
 	interface Aurora_Pins aurora = auroraIntraImport.aurora;
+	method Bit#(16) curSendBudget;
+		return aSendB;
+	endmethod
 endmodule
 
 module mkAuroraImport_8b10b_bsim (AuroraImportIfc#(4));
@@ -183,7 +231,7 @@ module mkAuroraImport_8b10b_zynq#(Clock gtx_clk_in, Clock init_clk, Reset init_r
 
 	input_clock (INIT_CLK_IN) = init_clk;
 	input_reset (RESET_N) = init_rst_n;
-	input_reset (GT_RESET_N) clocked_by (gtx_clk_in) = gt_rst_n;
+	input_reset (GT_RESET_N) = gt_rst_n;
 
 	output_clock aurora_clk(USER_CLK);
 	output_reset aurora_rst(USER_RST_N) clocked_by (aurora_clk);

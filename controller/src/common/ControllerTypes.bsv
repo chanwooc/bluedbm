@@ -210,6 +210,7 @@ interface FlashCtrlUser;
 	method ActionValue#(Tuple2#(Bit#(128), TagT)) readWord (); 
 	method ActionValue#(TagT) writeDataReq(); 
 	method ActionValue#(Tuple2#(TagT, StatusT)) ackStatus (); 
+	method Bit#(1) channel_up;
 endinterface
 
 

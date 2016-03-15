@@ -32,6 +32,7 @@ endinterface
 typedef TMul#(2, TAdd#(128, TLog#(NumTags))) SerInSz;
 
 interface FCZynqDebug;
+	method Bit#(16) curSendBudgetAurora;
 	method Tuple2#(DataIfc, PacketType) debugRecPacket();
 	method Tuple4#(Bit#(32), Bit#(32), Bit#(32), Bit#(32)) getDebugCnts;
 endinterface
@@ -42,7 +43,7 @@ interface FlashCtrlZynqIfc;
 	interface FCZynqDebug debug;
 endinterface
 
-
+(* synthesize *)
 module mkFlashCtrlZynq#(
 	Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (FlashCtrlZynqIfc);
 
@@ -211,9 +212,12 @@ module mkFlashCtrlZynq#(
 			ackQ.deq();
 			return ackQ.first();
 		endmethod
+
+		method Bit#(1) channel_up = auroraIntra.channel_up;
 	endinterface
 
 	interface FCZynqDebug debug;
+		method Bit#(16) curSendBudgetAurora = auroraIntra.curSendBudget;
 		method Tuple2#(DataIfc, PacketType) debugRecPacket();
 			return debugRecPacketV;
 		endmethod
