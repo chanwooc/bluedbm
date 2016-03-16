@@ -5,6 +5,7 @@ import BRAM::*;
 import GetPut::*;
 import ClientServer::*;
 import Vector::*;
+import Clocks::*;
 
 //import ConnectalMemory::*;
 import MemTypes::*;
@@ -29,6 +30,19 @@ interface FlashCtrlUser;
 endinterface
 */
 
+// To make timing constraints easier
+interface ClockDiv4Ifc;
+	interface Clock slowClock;
+endinterface
+
+(* synthesize *)
+module mkClockDiv4#(Clock fastClock) (ClockDiv4Ifc);
+	MakeResetIfc fastReset <- mkReset(8, True, fastClock);
+	ClockDividerIfc clockdiv4 <- mkClockDivider(4, clocked_by fastClock, reset_by fastReset.new_rst);
+
+	interface slowClock = clockdiv4.slowClock;
+endmodule
+
 typedef TMul#(2, TAdd#(128, TLog#(NumTags))) SerInSz;
 
 interface FCZynqDebug;
@@ -47,7 +61,9 @@ module mkFlashCtrlZynq#(
 	Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (FlashCtrlZynqIfc);
 
 	//GTX-GTP Aurora
-	AuroraIfc auroraIntra <- mkAuroraIntra(gtx_clk_p, gtx_clk_n, clk200);
+	ClockDiv4Ifc auroraIntraClockDiv4 <- mkClockDiv4(clk200);
+	Clock clk50 = auroraIntraClockDiv4.slowClock;
+	AuroraIfc auroraIntra <- mkAuroraIntra(gtx_clk_p, gtx_clk_n, clk50);
 
 	FIFO#(FlashCmd) flashCmdQ <- mkSizedFIFO(16); //should not have back pressure
 	FIFO#(Tuple2#(Bit#(128), TagT)) wrDataQ <- mkSizedFIFO(16); //TODO size?

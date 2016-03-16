@@ -319,7 +319,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	Reg#(Bit#(32)) dmaWriteSgid <- mkReg(0);
 	//each bram fifo vec is responsible for NumTags/NUM_ENG_PORTS = 128/8 = 16 tags
 	Vector#(NUM_ENG_PORTS, BRAMFIFOVectorIfc#(TLog#(TAGS_PER_PORT), 12, Tuple2#(Bit#(WordSz), TagT))) bramFifoVec <- replicateM(mkBRAMFIFOVectorSynth());
-	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(TagT, Bit#(32)))) dmaReq2RespQ <- replicateM(mkSizedFIFO(16)); //TODO sz?
+	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(TagT, Bit#(32)))) dmaWrReq2RespQ <- replicateM(mkSizedFIFO(16)); //TODO sz?
 	Vector#(NUM_ENG_PORTS, FIFO#(MemengineCmd)) dmaWriteReqQ <- replicateM(mkSizedFIFO(16));
 	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFO);
 
@@ -384,7 +384,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 							};
 			bramFifoVec[p].reqDeq(rdyIdx);
 			dmaWriteReqQ[p].enq(dmaCmd);
-			dmaReq2RespQ[p].enq(tuple2(tag, rdyCnt));
+			dmaWrReq2RespQ[p].enq(tuple2(tag, rdyCnt));
 			$display("[%d] @%d Main.bsv: init dma write rdyIdx=%d, rdyCnt=%d, engId=%d, tag=%d, addr=0x%x 0x%x", myNodeId, 
 							cycleCnt, rdyIdx, rdyCnt, p, tag, dmaWriteSgid, burstOffset);
 		endrule
@@ -420,8 +420,8 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 		rule dmaWriterGetResponse;
 			let weS = getWEServer(we,p);
 			let dummy <- weS.done.get;
-			match{.tag, .idxCnt} = dmaReq2RespQ[p].first;
-			dmaReq2RespQ[p].deq;
+			match{.tag, .idxCnt} = dmaWrReq2RespQ[p].first;
+			dmaWrReq2RespQ[p].deq;
 			//$display("[%d] @%d Main.bsv: dma resp [%d] tag=%d", myNodeId, cycleCnt, idxCnt, tag);
 			if ( idxCnt == fromInteger(dmaBurstsPerPage-1) ) begin
 				dmaWriteDoneQs[p].enq(tag);

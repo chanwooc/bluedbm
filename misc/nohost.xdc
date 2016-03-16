@@ -1,3 +1,5 @@
+
+
 #CDC from auroraIntra clocks to/from ps7_fclk_0_c/O (usually 200MHz Clock)
 set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks auroraI_user_clk_i] -datapath_only 5.0
 set_max_delay -from [get_clocks auroraI_user_clk_i] -to [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -datapath_only 5.0

@@ -388,12 +388,14 @@ int main(int argc, const char **argv)
 	ref_dstAlloc = dma->reference(dstAlloc);
 	ref_srcAlloc = dma->reference(srcAlloc);
 
+	device->setDmaWriteRef(ref_dstAlloc);
+	device->setDmaReadRef(ref_srcAlloc);
 	for (int t = 0; t < NUM_TAGS; t++) {
 		readTagTable[t].busy = false;
 		writeTagTable[t].busy = false;
 		int byteOffset = t * FPAGE_SIZE;
-		device->addDmaWriteRefs(ref_dstAlloc, byteOffset, t);
-		device->addDmaReadRefs(ref_srcAlloc, byteOffset, t);
+		//device->addDmaWriteRefs(ref_dstAlloc, byteOffset, t);
+		//device->addDmaReadRefs(ref_srcAlloc, byteOffset, t);
 		readBuffers[t] = dstBuffer + byteOffset/sizeof(unsigned int);
 		writeBuffers[t] = srcBuffer + byteOffset/sizeof(unsigned int);
 	}
