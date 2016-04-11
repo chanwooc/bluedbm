@@ -155,7 +155,7 @@
 
 	// System Interface
 	RESET_N,
-	GT_RESET_N,
+//	GT_RESET_N,
 	INIT_CLK_IN,
 	GTX_CLK,
 
@@ -301,7 +301,7 @@
 	//////////////////////////////////////////////
 	// System Inferface
 	input RESET_N;
-	input GT_RESET_N;
+//	input GT_RESET_N;
 	input INIT_CLK_IN;
 	input GTX_CLK;
 

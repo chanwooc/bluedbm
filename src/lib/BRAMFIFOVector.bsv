@@ -15,7 +15,7 @@ interface BRAMFIFOVectorIfc#(numeric type vlog, numeric type fifosize, type fifo
 	method Action enq(fifotype data, Bit#(vlog) idx);
 	method Action reqDeq(Bit#(vlog) idx);
 	method ActionValue#(fifotype) respDeq;
-	method ActionValue#(Tuple2#(Bit#(vlog), Bit#(32))) getReadyIdx;
+	method ActionValue#(Tuple2#(Bit#(vlog), Bit#(16))) getReadyIdx; // 32->16 (timing)
 endinterface
 
 
@@ -28,14 +28,14 @@ module mkBRAMFIFOVector#(Integer thresh, Integer burstsPerIdx, Integer padBursts
 	Integer fifoSize = valueOf(fifosize);
 	Integer numReadys = (burstsPerIdx + padBursts) / thresh;
 
-	Vector#(TExp#(vlog), Reg#(Bit#(32))) enqTotal <- replicateM(mkReg(0));
+	Vector#(TExp#(vlog), Reg#(Bit#(16))) enqTotal <- replicateM(mkReg(0)); //32->16
 	Reg#(Bit#(16)) padCnt <- mkReg(0);
 	Reg#(Bit#(vlog)) padIdx <- mkReg(0);
 	Reg#(fifotype) padData <- mkRegU();
 	//including all eventual deqs when burst starts
-	//Vector#(TExp#(vlog), Reg#(Bit#(32))) deqTotal <- replicateM(mkReg(0)); 
-	Vector#(TExp#(vlog), Reg#(Bit#(32))) enqCnt <- replicateM(mkReg(0)); 
-	Vector#(TExp#(vlog), Reg#(Bit#(32))) rdyCnt <- replicateM(mkReg(0)); 
+	//Vector#(TExp#(vlog), Reg#(Bit#(16))) deqTotal <- replicateM(mkReg(0)); 
+	Vector#(TExp#(vlog), Reg#(Bit#(16))) enqCnt <- replicateM(mkReg(0)); //32->16
+	Vector#(TExp#(vlog), Reg#(Bit#(16))) rdyCnt <- replicateM(mkReg(0)); //32->16
 	Vector#(TExp#(vlog), Reg#(Bit#(TAdd#(1,TLog#(fifosize))))) deqCnt <- replicateM(mkReg(0)); 
 	//Vector#(TExp#(vlog), Reg#(Bit#(TAdd#(1,TLog#(fifosize))))) deqCurrent <- replicateM(mkReg(0)); 
 
@@ -71,7 +71,7 @@ module mkBRAMFIFOVector#(Integer thresh, Integer burstsPerIdx, Integer padBursts
 	//FIFO#(Bool) fakeQ0 <- mkFIFO;
 	//FIFO#(Bool) fakeQ1 <- mkFIFO;
 	
-	FIFO#(Tuple2#(Bit#(vlog), Bit#(32))) readyIdxQ <- mkSizedFIFO(valueOf(TExp#(vlog)));
+	FIFO#(Tuple2#(Bit#(vlog), Bit#(16))) readyIdxQ <- mkSizedFIFO(valueOf(TExp#(vlog))); //32->16
 
 	//FIFO#(Tuple2#(fifotype, Bit#(vlog))) enqQ <- mkSizedFIFO(1);
 	FIFO#(fifotype) enqQ <- mkFIFO();
@@ -176,7 +176,7 @@ module mkBRAMFIFOVector#(Integer thresh, Integer burstsPerIdx, Integer padBursts
 		return v;
 	endmethod
 
-	method ActionValue#(Tuple2#(Bit#(vlog), Bit#(32))) getReadyIdx;
+	method ActionValue#(Tuple2#(Bit#(vlog), Bit#(16))) getReadyIdx; //32->16
 		readyIdxQ.deq;
 		return readyIdxQ.first;
 	endmethod

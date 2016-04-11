@@ -21,11 +21,13 @@ module mkStreamingDeserializer (StreamingDeserializerIfc#(tFrom, tTo))
 
 	FIFO#(tTo) outQ <- mkFIFO;
 
-	method ActionValue#(tTo) deq;
-		outQ.deq;
-		return outQ.first;
-	endmethod
-	method Action enq(tFrom in, Bool cont);
+	// inQ added for pipelining to meet timing constraints
+	FIFO#(Tuple2#(tFrom, Bool)) inQ <- mkFIFO;
+
+	rule deserialize;
+		match{.in, .cont} = inQ.first;
+		inQ.deq;
+
 		let inData = pack(in);
 		Bit#(tToSz) nextBuffer = outBuffer | (zeroExtend(inData)<<outCounter);
 
@@ -54,6 +56,15 @@ module mkStreamingDeserializer (StreamingDeserializerIfc#(tFrom, tTo))
 			outBuffer <= 0;
 			outCounter <= 0;
 		end
+	endrule
+
+	method ActionValue#(tTo) deq;
+		outQ.deq;
+		return outQ.first;
+	endmethod
+
+	method Action enq(tFrom in, Bool cont);
+		inQ.enq(tuple2(in,cont));
 	endmethod
 endmodule
 

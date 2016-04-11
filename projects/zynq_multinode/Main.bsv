@@ -98,11 +98,11 @@ Integer dmaBurstWords = dmaBurstBytes/wordBytes; //128/16 = 8
 Integer dmaBurstsPerPage = (pageSizeUser+dmaBurstBytes-1)/dmaBurstBytes; //ceiling, 65
 Integer dmaBurstWordsLast = (pageSizeUser%dmaBurstBytes)/wordBytes; //num bursts in last dma; 2 bursts
 
+Integer dmaAllocPageSizeLog = 14; //typically portal alloc page size is 16KB; MUST MATCH SW
+Integer dmaLength = dmaBurstsPerPage * dmaBurstBytes; // 65 * 128 = 8320
+
 // added for multinode
 Integer pagePadCnt = dmaBurstWords - dmaBurstWordsLast; //6
-Integer dmaAllocPageSizeLog = 14; //typically portal alloc page size is 16KB; MUST MATCH SW
-
-Integer dmaLength = dmaBurstsPerPage * dmaBurstBytes; // 65 * 128 = 8320
 
 interface MainIfc;
 	interface FlashRequest request;
@@ -149,37 +149,30 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
 
 	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_ENG_PORTS,NumReadClients))) rengine, Integer idx ) ;
-		//let numOfMasters = valueOf(NumberOfMasters);
-		//let numBuses = valueOf(NUM_ENG_PORTS);
-		
-		//return rengine[idx/2].readServers[idx%2];
-		//return rengine[0].readServers[idx];
-		return rengine[idx].readServers[0];
+		let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumReadClients));
+		let idxEngine = idx / numEngineServer;
+		let idxServer = idx % numEngineServer;
+
+		return rengine[idxEngine].readServers[idxServer];
+		//return rengine[idx].readServers[0];
 	endfunction
 	
 	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) wengine, Integer idx ) ;
-		//let numOfMasters = valueOf(NumberOfMasters);
-		//let numBuses = valueOf(NUM_ENG_PORTS);
-		
-		//return wengine[idx/2].writeServers[idx%2];
-		//return wengine[0].writeServers[idx];
-		return wengine[idx].writeServers[0];
-	endfunction
+		let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumWriteClients));
+		let idxEngine = idx / numEngineServer;
+		let idxServer = idx % numEngineServer;
 
+		return wengine[idxEngine].writeServers[idxServer];
+		//return wengine[idx].writeServers[0];
+	endfunction
 
 	//--------------------------------------------
 	// Module Instantiation for External Aurora (Quad 109)
 	//--------------------------------------------
-	`ifndef BSIM
-		ClockDividerIfc auroraExtClockDiv4 <- mkDCMClockDivider(4, 5, clocked_by clk200);
-		Clock clk50 = auroraExtClockDiv4.slowClock;
-	`else
-		Clock clk50 = curClk;
-	`endif
 
 	// zc706 uses quad109 for aurora ext
 	GtxClockImportIfc gtx_clk_109 <- mkGtxClockImport;
-	AuroraExtIfc auroraExt109 <- mkAuroraExt(gtx_clk_109.gtx_clk_p_ifc, gtx_clk_109.gtx_clk_n_ifc, clk50);
+	AuroraExtIfc auroraExt109 <- mkAuroraExt(gtx_clk_109.gtx_clk_p_ifc, gtx_clk_109.gtx_clk_n_ifc, clk200);
 	
 	Reg#(HeaderField) myNodeId <- mkReg(0); 
 	AuroraEndpointIfc#(Tuple2#(Bit#(WordSz), TagT)) aendRd <- mkAuroraEndpointDynamic(256, 256, 768);
@@ -375,7 +368,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 			//req DMA
 			TagT tag = encTag(rdyIdx, fromInteger(p));
 			Bit#(32) pageOffset = calcDmaPageOffset(tag);
-			Bit#(32) burstOffset = (rdyCnt<<log2(dmaBurstBytes)) + pageOffset;
+			Bit#(32) burstOffset = (zeroExtend(rdyCnt)<<log2(dmaBurstBytes)) + pageOffset;
 			let dmaCmd = MemengineCmd {
 								sglId: dmaWriteSgid, 
 								base: zeroExtend(burstOffset),
@@ -384,7 +377,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 							};
 			bramFifoVec[p].reqDeq(rdyIdx);
 			dmaWriteReqQ[p].enq(dmaCmd);
-			dmaWrReq2RespQ[p].enq(tuple2(tag, rdyCnt));
+			dmaWrReq2RespQ[p].enq(tuple2(tag, zeroExtend(rdyCnt)));
 			$display("[%d] @%d Main.bsv: init dma write rdyIdx=%d, rdyCnt=%d, engId=%d, tag=%d, addr=0x%x 0x%x", myNodeId, 
 							cycleCnt, rdyIdx, rdyCnt, p, tag, dmaWriteSgid, burstOffset);
 		endrule

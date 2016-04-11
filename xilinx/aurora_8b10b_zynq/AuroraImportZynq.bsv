@@ -31,21 +31,24 @@ interface AuroraIfc;
 endinterface
 
 (* synthesize *)
-module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk50) (AuroraIfc);
+module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (AuroraIfc);
 
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
-	
+
 
 `ifndef BSIM
-	Reset rst50 <- mkAsyncReset(2, curRst, clk50);
+	ClockDiv4Ifc auroraIntraClockDiv4 <- mkClockDiv4(clk200);
+	Clock clk50 = auroraIntraClockDiv4.slowClock;
+
+	Reset rst50 <- mkAsyncReset(3, curRst, clk50); //reset should be min 6 user_clk(110MHz) cycles
 	Clock fmc1_gtx_clk_i <- mkClockIBUFDS_GTE2(
 `ifdef ClockDefaultParam
 						   defaultValue,
 `endif
 						   True, gtx_clk_p, gtx_clk_n);
 
-	MakeResetIfc rstgtxifc <- mkReset(8, True, clk50);
+	MakeResetIfc rstgtxifc <- mkReset(8, True, clk50); //gtx_reset should be min 6 init_clk cycles
 	Reset rstgtx = rstgtxifc.new_rst;
 	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_zynq(fmc1_gtx_clk_i, clk50, rst50, rstgtx);
 `else

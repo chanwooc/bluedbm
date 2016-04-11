@@ -69,7 +69,7 @@ set_property LOC AD9 [get_ports aurora_quad109_gtx_clk_n_v]
 create_clock -name GTXQ0_left_109_i -period 1.600	 [get_pins *auroraExt109/auroraExt_gtx_clk/O]
 
 # Board Init Clk
-create_clock -name aurora_init_clk_i -period 20.0 [get_pins *auroraExtClockDiv4_slowbuf/O]
+create_clock -name auroraE_init_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*auroraExtClockDiv4/Q}]
 
 # Aurora clks (user/sync)
 create_clock -name TS_user_clk_i_all -period 6.400	 [get_pins -hier -filter {NAME =~ *aurora_64b66b_block_i/clock_module_i/user_clk_net_i/O}]
@@ -79,11 +79,11 @@ create_clock -name TS_sync_clk_i_all -period 3.200	 [get_pins -hier -filter {NAM
 set_false_path -from [get_cells -hier -filter {NAME =~ *auroraExt109/rst50/*}]
 set_false_path -to [get_pins -hier -filter {NAME =~ *auroraExt109/rst50/*/CLR}]
 
-#CDC from "init clk" to aurora user/sync clk
-set_false_path -from [get_clocks aurora_init_clk_i] -to [get_clocks TS_user_clk_i_all]
-set_false_path -from [get_clocks TS_user_clk_i_all] -to [get_clocks aurora_init_clk_i]
-set_false_path -from [get_clocks aurora_init_clk_i] -to [get_clocks TS_sync_clk_i_all]
-set_false_path -from [get_clocks TS_sync_clk_i_all] -to [get_clocks aurora_init_clk_i]
+#CDC from "init clk" to aurora user & sync clk
+set_false_path -from [get_clocks auroraE_init_clk_i] -to [get_clocks TS_user_clk_i_all]
+set_false_path -from [get_clocks TS_user_clk_i_all] -to [get_clocks auroraE_init_clk_i]
+set_false_path -from [get_clocks auroraE_init_clk_i] -to [get_clocks TS_sync_clk_i_all]
+set_false_path -from [get_clocks TS_sync_clk_i_all] -to [get_clocks auroraE_init_clk_i]
 
 #CDC from ps7 clk_fpga_0 clk to aurora user clk. Should be read after zc706.xdc
 set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks TS_user_clk_i_all] -datapath_only [get_property CLKIN1_PERIOD [get_cells ps7_clockGen_pll]]

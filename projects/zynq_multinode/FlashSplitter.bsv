@@ -51,7 +51,10 @@ module mkFlashSplitter(FlashSplitterIfc);
 
 	//tag -> srcnodeId, dstNodeId
 	//BRAM2Port#(TagT, TagEntry) tagTable <- mkBRAM2Server(defaultValue);
-	BRAMMultiRead#(TagT, TagEntry, 3) tagTable <- mkBRAMMultiRead(defaultValue);
+	BRAM_Configure cfg = defaultValue;
+	cfg.latency=2;
+	cfg.outFIFODepth=4;
+	BRAMMultiRead#(TagT, TagEntry, 3) tagTable <- mkBRAMMultiRead(cfg);
 
 	FIFO#(FlashCmdRoute) locCmdInQ <- mkFIFO();
 	FIFO#(FlashCmdRoute) locCmdOutQ <- mkFIFO();
@@ -272,6 +275,7 @@ module mkFlashSplitter(FlashSplitterIfc);
 		interface sendCmd = toPut(locCmdInQ);
 		interface readWord = toGet(remRdOutQ);
 		interface writeWord = toPut(locWdataOutQ); //direct
+//		interface writeWord = toPut(locWdataInQ);  //indirect
 		interface writeDataReq = toGet(remWreqOutQ);
 		interface ackStatus = toGet(remAckOutQ);
 	endinterface

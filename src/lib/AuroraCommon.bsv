@@ -12,6 +12,20 @@ import ConnectalClocks::*;
 typedef 2 AuroraExtCount;
 //typedef 4 AuroraExtQuad; // defined in zynq_multinode (?)
 
+// Clock module for init_clk
+// To make timing constraints easier
+interface ClockDiv4Ifc;
+	interface Clock slowClock;
+endinterface
+
+(* synthesize *)
+module mkClockDiv4#(Clock fastClock) (ClockDiv4Ifc);
+	MakeResetIfc fastReset <- mkReset(8, True, fastClock);
+	ClockDividerIfc clockdiv4 <- mkClockDivider(4, clocked_by fastClock, reset_by fastReset.new_rst);
+
+	interface slowClock = clockdiv4.slowClock;
+endmodule
+
 `ifndef BSIM
 (* always_enabled, always_ready *)
 `endif

@@ -136,7 +136,31 @@ module mkAuroraEndpointDynamic#(Integer qSize, Integer flowStride_, Integer extr
 	end else begin
 		recvQ <- mkSizedBRAMFIFO(recvQDepth);
 	end
+
+	// pipelining recvQ to meet timing constraints
+	FIFO#(Tuple2#(t, HeaderField)) recvQin <- mkFIFO;
+	FIFO#(Tuple2#(t, HeaderField)) recvQout <- mkFIFO;
+
+	rule recvQpipeIn;
+		recvQ.enq(recvQin.first);
+		recvQin.deq;
+	endrule
+
+	rule recvQpipeOut;
+		recvQout.enq(recvQ.first);
+		recvQ.deq;
+	endrule
+
+
 	FIFOF#(HeaderField) ackQ <- mkSizedFIFOF(nodeCount*(1+(qSize/flowStride)));
+
+	// pipelining ackQ to meet timing constraints
+	FIFO#(HeaderField) ackQin <- mkFIFO;
+
+	rule ackQpipe;
+		ackQ.enq(ackQin.first);
+		ackQin.deq;
+	endrule
 
 	Reg#(Bit#(16)) recvQAvailUp <- mkReg(fromInteger(extraSize));
 	Reg#(Bit#(16)) recvQAvailDown <- mkReg(0);
@@ -180,7 +204,8 @@ module mkAuroraEndpointDynamic#(Integer qSize, Integer flowStride_, Integer extr
 
 	endrule
 
-	Vector#(NodeCount, Reg#(Bit#(16))) flowStrideCounter <- replicateM(mkReg(fromInteger(flowStride - 1)));
+	// flowStride: 256(=2^8) at maximum now  (width 16->9)
+	Vector#(NodeCount, Reg#(Bit#(9))) flowStrideCounter <- replicateM(mkReg(fromInteger(flowStride - 1)));
 	
 interface AuroraEndpointUserIfc user;
 	method Action send(t data, Bit#(HeaderFieldSz) dst);// if ( sendBudget.sub(dst) > 0 );
@@ -188,15 +213,16 @@ interface AuroraEndpointUserIfc user;
 	endmethod
 	method ActionValue#(Tuple2#(t, Bit#(HeaderFieldSz))) receive;
 		// send ack to src
-		let d_ = recvQ.first;
+		let d_ = recvQout.first;
 		let data = tpl_1(d_);
 		let src = tpl_2(d_);
 		Bit#(NodeCountLog) srcm = truncate(src);
 
 		recvQAvailUp <= recvQAvailUp + 1;
 
+		//if ( flowStrideCounter[srcm] == fromInteger(flowStride - 1) ) begin // for better timing??
 		if ( flowStrideCounter[srcm] +1 >= fromInteger(flowStride) ) begin
-			ackQ.enq(src);
+			ackQin.enq(src);
 			flowStrideCounter[srcm] <= 0;
 		end else begin
 			flowStrideCounter[srcm] <= flowStrideCounter[srcm]+1;
@@ -204,7 +230,7 @@ interface AuroraEndpointUserIfc user;
 		//$display ( "enqing ack packet to %d", src );
 
 
-		recvQ.deq;
+		recvQout.deq;
 		return d_;
 	endmethod
 endinterface
@@ -218,7 +244,7 @@ interface AuroraEndpointCmdIfc cmd;
 			sendBudgetUp[srcm] <= sendBudgetUp[srcm]+fromInteger(flowStride);
 			//tempThrottleQ[data.src].deq;
 		end else begin
-			recvQ.enq(tuple2(unpack(truncate(data.payload>>1)), data.src));
+			recvQin.enq(tuple2(unpack(truncate(data.payload>>1)), data.src));
 		end
 	endmethod
 	method ActionValue#(AuroraPacket) receive;
@@ -299,7 +325,8 @@ module mkAuroraEndpointStatic#(Integer qSize, Integer flowStride_) (AuroraEndpoi
 
 	endrule
 
-	Vector#(NodeCount, Reg#(Bit#(16))) flowStrideCounter <- replicateM(mkReg(0));
+	// flowStride: 256(=2^8) at maximum now  (width 16->9)
+	Vector#(NodeCount, Reg#(Bit#(9))) flowStrideCounter <- replicateM(mkReg(0));
 	
 interface AuroraEndpointUserIfc user;
 	method Action send(t data, Bit#(HeaderFieldSz) dst);// if ( sendBudget.sub(dst) > 0 );
