@@ -25,7 +25,7 @@ endinterface
 
 interface DDRLedPins;
 	interface LEDS leds;
-	interface DDR3_Pins_VC707_1GB pins_ddr3;
+	interface DDR3_Pins_ZC706 pins_ddr3;
 	(* prefix="", always_ready, always_enabled *)
 	method Action assert_reset((* port="SW" *)Bit#(1) sw);
 endinterface
@@ -83,11 +83,11 @@ module mkDDRLed#(HostInterface host, DDRLedIndication indication)(DDRLed);
 	FIFO#(Bit#(32)) pendingRead <- mkSizedFIFO(20);
 
 	C2B r2b_rst200 <- mkR2B(rst200);
-	C2B r2b_ddr3rstn <- mkR2B(ddr3rstn);
+	C2B r2b_ddr3rstn <- mkR2B(dram_ctrl.reset_n);
 
 	rule ledval;
 		counter <= counter+1;
-		init_done <= pack(ddr3_ctrl.user.init_done);
+		init_done <= pack(dram_ctrl.init_done);
 	endrule
 
 	rule read_indication;
@@ -98,11 +98,11 @@ module mkDDRLed#(HostInterface host, DDRLedIndication indication)(DDRLed);
 
 	interface DDRLedRequest request;
 		method Action write(Bit#(32) addr, Bit#(32) data_high, Bit#(32) data_low);
-			dram_ctrl.write(truncate(extend(addr)), extend({data_high, data_low}), (1<<64)-1);
+			dram_ctrl.write(truncate((addr)), extend({data_high, data_low}), (1<<64)-1);
 		endmethod
 
 		method Action readReq(Bit#(32) addr);
-			dram_ctrl.readReq(truncate(extend(addr)));
+			dram_ctrl.readReq(truncate((addr)));
 			pendingRead.enq(counter);
 		endmethod
 	endinterface

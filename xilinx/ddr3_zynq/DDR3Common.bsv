@@ -26,8 +26,6 @@ import BUtils            ::*;
 import I2C               ::*;
 import Connectable       ::*;
 
-//import Cntrs::*;
-
 ////////////////////////////////////////////////////////////////////////////////
 /// Exports
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,10 +36,10 @@ import Connectable       ::*;
 typedef struct {
    Bool        simulation;
    Integer     reads_in_flight;
-} DDR3_Configure_1G;
+} DDR3_Configure;
 
-instance DefaultValue#(DDR3_Configure_1G);
-   defaultValue = DDR3_Configure_1G {
+instance DefaultValue#(DDR3_Configure);
+   defaultValue = DDR3_Configure {
       simulation:       False,
       reads_in_flight:  8
       };
@@ -57,9 +55,14 @@ typedef struct {
    Bit#(datawidth)  data;
 } DDR3Response#(numeric type datawidth) deriving (Bits, Eq);		
 
+// Despite the name, the first four parameters specify the user application
+// side of the memory controller; while the remaining parameters specify
+// the DDR3 pins side.
+//
 `define DDR3_PRM_DCL numeric type ddr3addrsize,\
                      numeric type ddr3datasize,\
                      numeric type ddr3besize,\
+                     numeric type ddr3beats,\
                      numeric type datawidth,\
                      numeric type bewidth,\
                      numeric type rowwidth,\
@@ -69,12 +72,12 @@ typedef struct {
 		     numeric type clkwidth,\
 		     numeric type cswidth,\
 		     numeric type ckewidth,\
-		     numeric type odtwidth,\
-		     numeric type clkratio
+		     numeric type odtwidth
 
 `define DDR3_PRM     ddr3addrsize,\
                      ddr3datasize,\
                      ddr3besize,\
+                     ddr3beats,\
                      datawidth,\
                      bewidth,\
                      rowwidth,\
@@ -84,8 +87,7 @@ typedef struct {
 		     clkwidth,\
 		     cswidth,\
 		     ckewidth,\
-		     odtwidth,\
-		     clkratio
+		     odtwidth
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Interfaces
@@ -129,10 +131,10 @@ interface DDR3_User#(`DDR3_PRM_DCL);
    interface Reset                    reset_n;
    method    Bool                     init_done;
    method    Action                   request(Bit#(ddr3addrsize) addr,
-					      Bit#(TMul#(ddr3besize, TDiv#(clkratio,2)))   mask,
-					      Bit#(TMul#(ddr3datasize, TDiv#(clkratio,2))) data
+					      Bit#(TMul#(ddr3besize,ddr3beats))   mask,
+					      Bit#(TMul#(ddr3datasize,ddr3beats)) data
 					      );
-   method    ActionValue#(Bit#(TMul#(ddr3datasize, TDiv#(clkratio,2)))) read_data;
+   method    ActionValue#(Bit#(TMul#(ddr3datasize,ddr3beats))) read_data;
 endinterface
 
 interface DDR3_Controller#(`DDR3_PRM_DCL);
@@ -187,8 +189,150 @@ module mkAsyncResetLong#(Integer cycles, Reset rst_in, Clock clk_out)(Reset);
    return rstifc.new_rst;
 endmodule
 
-module mkXilinxDDR3Controller_2_1_#(VDDR3_Controller_Xilinx#(`DDR3_PRM) ddr3Ifc, DDR3_Configure_1G cfg)(DDR3_Controller#(`DDR3_PRM))
-   provisos( Add#(0, 2, clkratio)
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+///
+///
+///
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+module mkXilinxDDR3Controller_2beats#(VDDR3_Controller_Xilinx#(`DDR3_PRM) ddr3Ifc, DDR3_Configure cfg)(DDR3_Controller#(`DDR3_PRM))
+   provisos( NumAlias#(2, ddr3beats)
+	   , Add#(_1, 8, ddr3datasize)
+	   , Add#(_2, 1, ddr3addrsize)
+	   , Add#(_3, 1, ddr3besize)
+           , NumAlias#(TMul#(ddr3datasize,2), ddr3datasz)
+           , NumAlias#(TMul#(ddr3besize,2), ddr3besz)
+	    // ultimately the following shouldn't be necessary
+	   , Add#(ddr3besize, _4, TMul#(ddr3besize,2))
+           , Add#(ddr3datasize, _5, TMul#(ddr3datasize,2))
+	   );
+   
+   if (cfg.reads_in_flight < 1)
+      error("The number of reads in flight has to be at least 1");
+
+   Integer reads = cfg.reads_in_flight;
+   
+   ////////////////////////////////////////////////////////////////////////////////
+   /// Clocks & Resets
+   ////////////////////////////////////////////////////////////////////////////////
+   Clock                                     clock               <- exposeCurrentClock;
+   Reset                                     reset_n             <- exposeCurrentReset;
+   Reset                                     dly_reset_n         <- mkAsyncResetLong( 40000, reset_n, clock );
+
+   Clock                                     user_clock           = ddr3Ifc.user.clock;
+   Reset                                     user_reset0_n       <- mkResetInverter(ddr3Ifc.user.reset);
+   Reset                                     user_reset_n        <- mkAsyncReset(2, user_reset0_n, user_clock);
+   
+   ////////////////////////////////////////////////////////////////////////////////
+   /// Design Elements
+   ////////////////////////////////////////////////////////////////////////////////
+   FIFO#(DDR3Request#(ddr3addrsize,
+		      ddr3datasz,
+		      ddr3besz))             fRequest            <- mkFIFO(clocked_by user_clock, reset_by user_reset_n);
+   FIFO#(DDR3Response#(ddr3datasz))          fResponse           <- mkFIFO(clocked_by user_clock, reset_by user_reset_n);
+   
+   Counter#(32)                              rReadsPending       <- mkCounter(0, clocked_by user_clock, reset_by user_reset_n);
+   Reg#(Bool)                                rDeqWriteReq        <- mkReg(False, clocked_by user_clock, reset_by user_reset_n);
+   Reg#(Bool)                                rEnqReadResp        <- mkReg(False, clocked_by user_clock, reset_by user_reset_n);
+   Reg#(Bit#(ddr3datasize))                  rFirstResponse      <- mkReg(0, clocked_by user_clock, reset_by user_reset_n);
+   
+   PulseWire                                 pwAppEn             <- mkPulseWire(clocked_by user_clock, reset_by user_reset_n);
+   PulseWire                                 pwAppWdfWren        <- mkPulseWire(clocked_by user_clock, reset_by user_reset_n);
+   PulseWire                                 pwAppWdfEnd         <- mkPulseWire(clocked_by user_clock, reset_by user_reset_n);
+   
+   Wire#(Bit#(3))                            wAppCmd             <- mkDWire(0, clocked_by user_clock, reset_by user_reset_n);
+   Wire#(Bit#(ddr3addrsize))                 wAppAddr            <- mkDWire(0, clocked_by user_clock, reset_by user_reset_n);
+   Wire#(Bit#(ddr3besize))                   wAppWdfMask         <- mkDWire('1, clocked_by user_clock, reset_by user_reset_n);
+   Wire#(Bit#(ddr3datasize))                 wAppWdfData         <- mkDWire(0, clocked_by user_clock, reset_by user_reset_n);
+   
+   Bool initialized      = ddr3Ifc.user.init_done;
+   Bool ctrl_ready_req   = ddr3Ifc.user.app_rdy;
+   Bool write_ready_req  = ddr3Ifc.user.app_wdf_rdy;
+   Bool read_data_ready  = ddr3Ifc.user.app_rd_data_valid;
+   
+   ////////////////////////////////////////////////////////////////////////////////
+   /// Rules
+   ////////////////////////////////////////////////////////////////////////////////
+   (* fire_when_enabled, no_implicit_conditions *)
+   rule drive_enables;
+      ddr3Ifc.user.app_en(pwAppEn);
+      ddr3Ifc.user.app_wdf_wren(pwAppWdfWren);
+      ddr3Ifc.user.app_wdf_end(pwAppWdfEnd);
+   endrule
+
+   (* fire_when_enabled, no_implicit_conditions *)
+   rule drive_data_signals;
+      ddr3Ifc.user.app_cmd(wAppCmd);
+      ddr3Ifc.user.app_addr(wAppAddr);
+      ddr3Ifc.user.app_wdf_data(wAppWdfData);
+      ddr3Ifc.user.app_wdf_mask(wAppWdfMask);
+   endrule
+   
+   rule ready(initialized);
+      rule process_write_request_first((fRequest.first.byteen != 0) && !rDeqWriteReq && ctrl_ready_req && write_ready_req);
+	 rDeqWriteReq <= True;
+	 wAppCmd      <= 0;
+	 wAppAddr     <= fRequest.first.address;
+	 pwAppEn.send;
+	 wAppWdfData  <= truncate(fRequest.first.data);
+	 wAppWdfMask  <= ~truncate(fRequest.first.byteen);
+	 pwAppWdfWren.send;
+      endrule
+      
+      rule process_write_request_second((fRequest.first.byteen != 0) && rDeqWriteReq && write_ready_req);
+	 fRequest.deq;
+	 rDeqWriteReq <= False;
+	 wAppWdfData  <= truncateLSB(fRequest.first.data);
+	 wAppWdfMask  <= ~truncateLSB(fRequest.first.byteen);
+	 pwAppWdfWren.send;
+	 pwAppWdfEnd.send;
+      endrule
+      
+      rule process_read_request(fRequest.first.byteen == 0 && ctrl_ready_req);
+	 fRequest.deq;
+	 wAppCmd  <= 1;
+	 wAppAddr <= fRequest.first.address;
+	 pwAppEn.send;
+	 rReadsPending.inc(2);
+      endrule
+      
+      rule process_read_response_first(!rEnqReadResp && read_data_ready);
+	 rFirstResponse <= ddr3Ifc.user.app_rd_data;
+	 rEnqReadResp   <= True;
+	 rReadsPending.down;
+      endrule
+      
+      rule process_read_response_second(rEnqReadResp && read_data_ready);
+	 fResponse.enq(unpack({ ddr3Ifc.user.app_rd_data, rFirstResponse }));
+	 rEnqReadResp   <= False;
+	 rReadsPending.down;
+      endrule
+   endrule
+
+   ////////////////////////////////////////////////////////////////////////////////
+   /// Interface Connections / Methods
+   ////////////////////////////////////////////////////////////////////////////////
+   interface ddr3 = ddr3Ifc.ddr3;
+   interface DDR3_User user;
+      interface clock   = user_clock;
+      interface reset_n = user_reset_n;
+      method init_done  = initialized;
+      
+      method Action request(Bit#(ddr3addrsize) addr, Bit#(ddr3besz) mask, Bit#(ddr3datasz) data);
+	 let req = DDR3Request { byteen: mask, address: addr, data: data };
+	 fRequest.enq(req);
+      endmethod
+	 
+      method ActionValue#(Bit#(ddr3datasz)) read_data;
+	 fResponse.deq;
+	 return fResponse.first.data;
+      endmethod
+   endinterface
+endmodule: mkXilinxDDR3Controller_2beats
+
+module mkXilinxDDR3Controller_1beat#(VDDR3_Controller_Xilinx#(`DDR3_PRM) ddr3Ifc, DDR3_Configure cfg)(DDR3_Controller#(`DDR3_PRM))
+   provisos( NumAlias#(1, ddr3beats)
 	   , Add#(_1, 8, ddr3datasize)
 	   , Add#(_2, 1, ddr3addrsize)
 	   , Add#(_3, 1, ddr3besize)
@@ -216,12 +360,9 @@ module mkXilinxDDR3Controller_2_1_#(VDDR3_Controller_Xilinx#(`DDR3_PRM) ddr3Ifc,
    FIFO#(DDR3Request#(ddr3addrsize,
 		      ddr3datasize,
 		      ddr3besize))           fRequest            <- mkFIFO(clocked_by user_clock, reset_by user_reset_n);
-   //FIFO#(DDR3Response#(ddr3datasize))        fResponse           <- mkSizedFIFO(reads, clocked_by user_clock, reset_by user_reset_n);
    FIFO#(DDR3Response#(ddr3datasize))        fResponse           <- mkFIFO(clocked_by user_clock, reset_by user_reset_n);
    
-   //Count#(Int#(32))                         rReadsPending       <- mkCount(0, clocked_by user_clock, reset_by user_reset_n);
    Counter#(32)                              rReadsPending       <- mkCounter(0, clocked_by user_clock, reset_by user_reset_n);
-
   
    PulseWire                                 pwAppEn             <- mkPulseWire(clocked_by user_clock, reset_by user_reset_n);
    PulseWire                                 pwAppWdfWren        <- mkPulseWire(clocked_by user_clock, reset_by user_reset_n);
@@ -267,20 +408,17 @@ module mkXilinxDDR3Controller_2_1_#(VDDR3_Controller_Xilinx#(`DDR3_PRM) ddr3Ifc,
 	 pwAppWdfEnd.send;
       endrule
       
-      //rule process_read_request(fRequest.first.byteen == 0 && ctrl_ready_req && rReadsPending < fromInteger(reads));
       rule process_read_request(fRequest.first.byteen == 0 && ctrl_ready_req);
 	 let request <- toGet(fRequest).get;
 	 wAppCmd  <= 1;
 	 wAppAddr <= request.address;
 	 pwAppEn.send;
-	 //rReadsPending.incr(1);
-         rReadsPending.up;
+	 rReadsPending.up;
       endrule
       
       rule process_read_response(read_data_ready);
 	 fResponse.enq(unpack(ddr3Ifc.user.app_rd_data));
-	 //rReadsPending.decr(1);
-         rReadsPending.down;
+	 rReadsPending.down;
       endrule
    endrule
 
@@ -303,6 +441,8 @@ module mkXilinxDDR3Controller_2_1_#(VDDR3_Controller_Xilinx#(`DDR3_PRM) ddr3Ifc,
 	 return fResponse.first.data;
       endmethod
    endinterface
-endmodule
+endmodule: mkXilinxDDR3Controller_1beat
+
 
 endpackage: DDR3Common
+

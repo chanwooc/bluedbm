@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2014  Bluespec, Inc.  ALL RIGHTS RESERVED.
 ////////////////////////////////////////////////////////////////////////////////
-//  Filename      : XilinxVC707DDR3.bsv
+//  Filename      : XilinxZC706DDR3.bsv
 //  Description   : 
 ////////////////////////////////////////////////////////////////////////////////
 package DDR3Controller;
@@ -38,16 +38,44 @@ import XilinxCells       ::*;
 ////////////////////////////////////////////////////////////////////////////////
 /// Types
 ////////////////////////////////////////////////////////////////////////////////
-//`define DDR3_VC707 29, 256, 32, 64, 8, 15, 10, 3, 1, 1, 1, 1, 1, 4
-//clkratio(actually 4:1, but for here 2)
-//addrwidth = 28???????
-`define DDR3_VC707 29, 512, 64, 64, 8, 14, 10, 3, 1, 1, 1, 1, 1, 2
+//`define DDR3_VC707 29, 256, 32, 2, 64, 8, 15, 10, 3, 1, 1, 1, 1, 1
+`define DDR3_UserAddrSz 28
+`define DDR3_UserDataSz 512
+`define DDR3_ZC706 `DDR3_UserAddrSz, `DDR3_UserDataSz, 64, 1, 64, 8, 14, 10, 3, 1, 1, 1, 1, 1
 
-typedef DDR3_Pins#(`DDR3_VC707) DDR3_Pins_VC707_1GB;
-typedef DDR3_User#(`DDR3_VC707) DDR3_User_VC707_1GB;
-typedef DDR3_Controller#(`DDR3_VC707) DDR3_Controller_VC707_1GB;
-typedef VDDR3_User_Xilinx#(`DDR3_VC707) VDDR3_User_Xilinx_VC707_1GB;
-typedef VDDR3_Controller_Xilinx#(`DDR3_VC707) VDDR3_Controller_Xilinx_VC707_1GB;
+typedef DDR3_Pins#(`DDR3_ZC706) DDR3_Pins_ZC706;
+typedef DDR3_User#(`DDR3_ZC706) DDR3_User_ZC706;
+typedef DDR3_Controller#(`DDR3_ZC706) DDR3_Controller_ZC706;
+typedef VDDR3_User_Xilinx#(`DDR3_ZC706) VDDR3_User_Xilinx_ZC706;
+typedef VDDR3_Controller_Xilinx#(`DDR3_ZC706) VDDR3_Controller_Xilinx_ZC706;
+
+// User types (added by Chanwoo)
+// Xilinx MIG core related types start with DDR3
+// Others start with DRAM
+typedef `DDR3_UserAddrSz DRAM_AddrSz;
+typedef `DDR3_UserDataSz DRAM_DataSz;
+typedef Bit#(DRAM_AddrSz) DRAM_AddrT;
+typedef Bit#(DRAM_DataSz) DRAM_DataT;
+typedef MemoryRequest#(DRAM_AddrSz, DRAM_DataSz) DRAM_Request;
+typedef MemoryResponse#(DRAM_DataSz) DRAM_Response;
+typedef MemoryClient#(DRAM_AddrSz, DRAM_DataSz) DRAM_Client;
+typedef MemoryServer#(DRAM_AddrSz, DRAM_DataSz) DRAM_Server;
+typedef 32 MAX_OUTSTANDING_READS;
+
+interface DRAM_Wrapper;
+//	interface Put#(DRAM_Request) request;
+//	interface Get#(DRAM_Response) response;
+
+	method Action readReq(DRAM_AddrT addr);
+	method Action write(DRAM_AddrT addr, DRAM_DataT data, Bit#(TDiv#(DRAM_DataSz,8)) byteen);
+	method ActionValue#(DRAM_DataT) read();
+	method Bool init_done;
+	
+	interface DDR3_Pins_ZC706 ddr3;
+
+	interface Clock clock;
+	interface Reset reset_n;
+endinterface
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +90,7 @@ typedef VDDR3_Controller_Xilinx#(`DDR3_VC707) VDDR3_Controller_Xilinx_VC707_1GB;
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 import "BVI" ddr3_wrapper =
-module vMkVC707DDR3Controller#(DDR3_Configure_1G cfg, Clock refclk)(VDDR3_Controller_Xilinx_VC707_1GB);
+module vMkZC706DDR3Controller#(DDR3_Configure cfg, Clock refclk)(VDDR3_Controller_Xilinx_ZC706);
    default_clock clk(sys_clk_i);
    default_reset rst(sys_rst);
    
@@ -131,17 +159,101 @@ module vMkVC707DDR3Controller#(DDR3_Configure_1G cfg, Clock refclk)(VDDR3_Contro
 
 endmodule
 
-
-
-
-module mkDDR3Controller_VC707_2_1#(DDR3_Configure_1G cfg, Clock refclk)(DDR3_Controller_VC707_1GB);
+module mkDDR3Controller_ZC706#(DDR3_Configure cfg, Clock refclk)(DDR3_Controller_ZC706);
    (* hide_all *)
-   let _v <- vMkVC707DDR3Controller(cfg, refclk);
-   let _m <- mkXilinxDDR3Controller_2_1_(_v, cfg);
+   let _v <- vMkZC706DDR3Controller(cfg, refclk);
+   let _m <- mkXilinxDDR3Controller_1beat(_v, cfg);
    return _m;
 endmodule
 
 
+//defined above
+//interface DDR3_Wrapper;
+//	interface Put#(DDR3_UserRequest) request;
+//	interface Get#(DDR3_UserResponse) response;
+//	
+//	interface DDR3_Pins_ZC706 ddr3;
+// endinterface
+
+
+// refclk: 200MHz FPGA clock, refrst: reset associated with refclk
+module mkDRAMWrapper#(Clock refclk, Reset refrst)(DRAM_Wrapper);
+	FIFO#(DRAM_Request)  reqs <- mkFIFO;
+	FIFO#(DRAM_Response) resp <- mkFIFO;
+
+	// a wrapper module for a Xilinx MIG IP core
+	DDR3_Configure cfg = defaultValue;
+	cfg.reads_in_flight = 32;
+	DDR3_Controller_ZC706 ddr3_ctrl <- mkDDR3Controller_ZC706(defaultValue, refclk, clocked_by refclk, reset_by refrst);
+
+	Clock uClock <- exposeCurrentClock;
+	Reset uReset <- exposeCurrentReset;
+	Clock dClock = ddr3_ctrl.user.clock;
+	Reset dReset = ddr3_ctrl.user.reset_n;
+
+	// Connectal clock domain <-> DRAM user clock domain
+	SyncFIFOIfc#(DRAM_Request)  reqs_sync <- mkSyncFIFO(8, uClock, uReset, dClock);
+	SyncFIFOIfc#(DRAM_Response) resp_sync <- mkSyncFIFO(8, dClock, dReset, uClock);
+
+	mkConnection(toGet(reqs), toPut(reqs_sync));
+	mkConnection(toPut(resp), toGet(resp_sync));
+
+	let dram_client = (
+		interface DRAM_Client;
+			interface request = toGet(reqs_sync);
+			interface response = toPut(resp_sync);
+		endinterface);
+	
+	mkConnection(dram_client, ddr3_ctrl.user, clocked_by dClock, reset_by dReset);
+
+	method Action readReq(DRAM_AddrT addr);
+		let req = DRAM_Request{write: False, byteen: ?, address:addr, data: ?};
+		toPut(reqs).put(req);
+	endmethod
+
+	method Action write(DRAM_AddrT addr, DRAM_DataT data, Bit#(TDiv#(DRAM_DataSz,8)) byteen);
+		let req = DRAM_Request{write: True, byteen: byteen, address:addr, data: data};
+		toPut(reqs).put(req);
+	endmethod
+
+	method ActionValue#(DRAM_DataT) read();
+		let d <- toGet(resp).get;
+		return d.data;
+	endmethod
+
+	method init_done = ddr3_ctrl.user.init_done;
+	interface ddr3 = ddr3_ctrl.ddr3;
+	interface clock = ddr3_ctrl.user.clock;
+	interface reset_n = ddr3_ctrl.user.reset_n;
+endmodule
+
+instance Connectable#(DRAM_Client, DDR3_User_ZC706);
+	module mkConnection#(DRAM_Client cli, DDR3_User_ZC706 usr)(Empty);
+		// Make sure we have enough buffer space to not drop responses!
+		Counter#(TLog#(MAX_OUTSTANDING_READS)) reads <- mkCounter(0, clocked_by(usr.clock), reset_by(usr.reset_n));
+		FIFO#(DRAM_Response) respbuf <- mkSizedFIFO(valueof(MAX_OUTSTANDING_READS), clocked_by(usr.clock), reset_by(usr.reset_n));
+   
+		rule request (reads.value() != fromInteger(valueof(MAX_OUTSTANDING_READS)-1));
+			let req <- cli.request.get();
+			usr.request(req.address, (req.write) ? req.byteen : 0, req.data);
+
+			if (req.write == False) begin
+				reads.up();
+			end
+		endrule
+   
+		rule response (True);
+			let x <- usr.read_data;
+			respbuf.enq(unpack(x));
+		endrule
+   
+		rule forward (True);
+			let x <- toGet(respbuf).get();
+			cli.response.put(x);
+			reads.down();
+		endrule
+	endmodule
+endinstance
 
 endpackage: DDR3Controller
 

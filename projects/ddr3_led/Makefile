@@ -1,9 +1,8 @@
 CONNECTALDIR?=../../tools/connectal/
-S2H_INTERFACES = EchoRequest:Echo.request
-H2S_INTERFACES = Echo:EchoIndication:host
+S2H_INTERFACES = DDRLedRequest:DDRLed.request
+H2S_INTERFACES = DDRLed:DDRLedIndication:host
 
-BSVFILES = Echo.bsv \
-		   ../../xilinx/ddr3_zynq/DDR3Controller.bsv ../../src/lib/AuroraCommon.bsv
+BSVFILES = DDRLed.bsv
 CPPFILES= main.cpp
 
 ifeq ($(BOARD),zc706)
@@ -13,13 +12,12 @@ endif
 
 CONNECTALFLAGS += -D IMPORT_HOSTIF -D XILINX_SYS_CLK
 
-PIN_TYPE = EchoPins
-PIN_TYPE_INCLUDE = Echo
+PIN_TYPE = DDRLedPins
+PIN_TYPE_INCLUDE = DDRLed
 PINOUT_FILE = pinout.sw.json
-AUTOTOP = --interface pins:Echo.pins
+AUTOTOP = --interface pins:DDRLed.pins
 
-NOHOST_XDC = ../../misc/nohost.xdc
-CONNECTALFLAGS += --bsvpath=../../xilinx/ddr3_zynq
+CONNECTALFLAGS += --bsvpath=../../xilinx/ddr3_zynq --bsvpath=../../src/lib
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/ddr3_zynq/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/ddr3_zynq/ddr3_zynq.xci \
