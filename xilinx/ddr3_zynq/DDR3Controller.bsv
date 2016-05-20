@@ -39,7 +39,7 @@ import XilinxCells       ::*;
 /// Types
 ////////////////////////////////////////////////////////////////////////////////
 //`define DDR3_VC707 29, 256, 32, 2, 64, 8, 15, 10, 3, 1, 1, 1, 1, 1
-`define DDR3_UserAddrSz 28
+`define DDR3_UserAddrSz 28    // 1+3+14+10 (rank/bank/row/col)
 `define DDR3_UserDataSz 512
 `define DDR3_ZC706 `DDR3_UserAddrSz, `DDR3_UserDataSz, 64, 1, 64, 8, 14, 10, 3, 1, 1, 1, 1, 1
 
@@ -72,7 +72,6 @@ interface DRAM_Wrapper;
 	method Bool init_done;
 	
 	interface DDR3_Pins_ZC706 ddr3;
-
 	interface Clock clock;
 	interface Reset reset_n;
 endinterface

@@ -17,7 +17,7 @@
     },
 	"SW" : {
 	"PIO_DIRECTION": "INPUT",
-	"pins" : "PL_CPU_RESET"
+	"pins" : "pl_cpu_reset"
 	}
 }
 

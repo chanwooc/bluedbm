@@ -18,6 +18,10 @@ PINOUT_FILE = pinout.sw.json
 AUTOTOP = --interface pins:DDRLed.pins
 
 CONNECTALFLAGS += --bsvpath=../../xilinx/ddr3_zynq --bsvpath=../../src/lib
+
+ifeq ($(BOARD), bluesim)
+CONNECTALFLAGS += -D BSIM
+else
 CONNECTALFLAGS += \
 	--verilog ../../xilinx/ddr3_zynq/ \
 	--xci $(CONNECTALDIR)/out/$(BOARD)/ddr3_zynq/ddr3_zynq.xci \
@@ -30,6 +34,7 @@ $(IPDIR)/$(BOARD)/ddr3_zynq/ddr3_zynq.xci: ../../core-scripts/synth-ddr3-zynq.tc
 ip.%:
 	make gen.$(*)
 	BOARD=$(*) make IPDIR=$(IPDIR) $(IPDIR)/$(*)/ddr3_zynq/ddr3_zynq.xci
+endif
 
 include $(CONNECTALDIR)/Makefile.connectal
 

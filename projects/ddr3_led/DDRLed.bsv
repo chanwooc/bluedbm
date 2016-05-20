@@ -3,9 +3,9 @@ import Vector::*;
 import Leds::*;
 
 // DDR3 support
-import DDR3Sim::*;
 import DDR3Controller::*;
 import DDR3Common::*;
+import DDR3Sim::*;
 //import DRAMController::*;
 import Connectable::*;
 import DefaultValue::*;
@@ -24,10 +24,12 @@ interface DDRLedIndication;
 endinterface
 
 interface DDRLedPins;
+	`ifndef BSIM
 	interface LEDS leds;
 	interface DDR3_Pins_ZC706 pins_ddr3;
 	(* prefix="", always_ready, always_enabled *)
 	method Action assert_reset((* port="SW" *)Bit#(1) sw);
+	`endif
 endinterface
 
 interface DDRLed;
@@ -35,42 +37,16 @@ interface DDRLed;
    interface DDRLedPins pins;
 endinterface
 
+`ifndef BSIM
 module mkDDRLed#(HostInterface host, DDRLedIndication indication)(DDRLed);
 	///////////////////////////
 	/// DDR3 instantiation
 	///////////////////////////
-`ifndef BSIM
-//	Clock clk200 = host.tsys_clk_200mhz_buf;
-//	//Reset rst200 <- mkAsyncResetFromCR(4, clk200);
-//	MakeResetIfc rst200_gen <- mkReset(100, True, clk200);
-//	Reset rst200 = rst200_gen.new_rst;
-//
-//	DRAMControllerIfc dramController <- mkDRAMController;
-//	
-//	DDR3_Configure_1G ddr3_cfg = defaultValue;
-//	//ddr3_cfg.reads_in_flight = 32; // adjust as needed
-//	DDR3_Controller_VC707_1GB ddr3_ctrl <- mkDDR3Controller_VC707_2_1(ddr3_cfg, clk200, clocked_by clk200, reset_by rst200);
-//
-//	Clock ddr3clk = ddr3_ctrl.user.clock;
-//	Reset ddr3rstn = ddr3_ctrl.user.reset_n;
-//	// default clk (200MHz) to ddr3 user clk (200MHz) crossing
-//	let ddr_cli_200Mhz <- mkDDR3ClientSync(dramController.ddr3_cli, clockOf(dramController), resetOf(dramController), ddr3clk, ddr3rstn);
-//	mkConnection(ddr_cli_200Mhz, ddr3_ctrl.user);
-
-
 	Clock clk200 = host.tsys_clk_200mhz_buf;
 	MakeResetIfc rst200_gen <- mkReset(100, True, clk200);
 	Reset rst200 = rst200_gen.new_rst;
 
 	DRAM_Wrapper dram_ctrl <- mkDRAMWrapper(clk200, rst200);
-
-
-
-`else
-//	DRAMControllerIfc dramController <- mkDRAMController;
-//	let ddr3_ctrl_user <- mkDDR3Simulator;
-//	mkConnection(dramController.ddr3_cli, ddr3_ctrl_user);
-`endif
 
 	/// led
 	//	led(0) = reset signal (ddr3rstn)
@@ -120,7 +96,9 @@ module mkDDRLed#(HostInterface host, DDRLedIndication indication)(DDRLed);
 				return ret;
 			endmethod
 		endinterface
+		`ifndef BSIM
 		interface pins_ddr3 = dram_ctrl.ddr3;
+		`endif
 		method Action assert_reset(Bit#(1) sw);
 			if (sw==1) begin
 				rst200_gen.assertReset();
@@ -128,3 +106,38 @@ module mkDDRLed#(HostInterface host, DDRLedIndication indication)(DDRLed);
 		endmethod
    endinterface
 endmodule
+`else
+module mkDDRLed#(HostInterface host, DDRLedIndication indication)(DDRLed);
+	///////////////////////////
+	/// DDR3 instantiation
+	///////////////////////////
+	DRAM_Wrapper dram_ctrl <- mkDRAMWrapperSim;
+
+	Reg#(Bit#(32)) counter <- mkReg(0);
+	FIFO#(Bit#(32)) pendingRead <- mkSizedFIFO(20);
+
+	rule ledval;
+		counter <= counter+1;
+	endrule
+
+	rule read_indication;
+		let d <- dram_ctrl.read;
+		pendingRead.deq;
+		indication.readDone(d[63:32], d[31:0], counter-pendingRead.first);
+	endrule
+
+	interface DDRLedRequest request;
+		method Action write(Bit#(32) addr, Bit#(32) data_high, Bit#(32) data_low);
+			dram_ctrl.write(truncate((addr)), extend({data_high, data_low}), (1<<64)-1);
+		endmethod
+
+		method Action readReq(Bit#(32) addr);
+			dram_ctrl.readReq(truncate((addr)));
+			pendingRead.enq(counter);
+		endmethod
+	endinterface
+
+	interface DDRLedPins pins;
+	endinterface
+endmodule
+`endif
