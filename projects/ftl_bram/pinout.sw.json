@@ -1,0 +1,22 @@
+{
+    "leds_leds[0]" : {
+	"PIO_DIRECTION": "OUTPUT",
+	"pins" : "GPIO_leds[0]"
+    },
+    "leds_leds[1]" : {
+	"PIO_DIRECTION": "OUTPUT",
+	"pins" : "GPIO_leds[1]"
+    },
+    "leds_leds[2]" : {
+	"PIO_DIRECTION": "OUTPUT",
+	"pins" : "GPIO_leds[2]"
+    },
+    "leds_leds[3]" : {
+	"PIO_DIRECTION": "OUTPUT",
+	"pins" : "GPIO_leds[3]"
+    },
+	"SW" : {
+	"PIO_DIRECTION": "INPUT",
+	"pins" : "pl_cpu_reset"
+	}
+}
