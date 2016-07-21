@@ -55,7 +55,7 @@ typedef FlashAddr PhyAddr;
 //in real hardware, RAM is initialized to FFFFFF
 //typedef enum { TRIM, DEAD, ALLOCATED, NOT_ALLOCATED } MapStatus deriving (Bits, Eq);
 //BRAM 0000
-typedef enum { NOT_ALLOCATED, ALLOCATED, TRIM, DEAD } MapStatus deriving (Bits, Eq);
+typedef enum { NOT_ALLOCATED, ALLOCATED, DEAD } MapStatus deriving (Bits, Eq);
 `else
 //For testing. At BSIM, RAM is initialized to AAAAAAA
 typedef enum { DEAD, ALLOCATED, NOT_ALLOCATED } MapStatus deriving (Bits, Eq);
@@ -67,7 +67,7 @@ typedef struct {
 } MapEntry deriving (Bits, Eq); // 16-bit (2-bytes) mapping entry
 
 `ifndef BSIM
-//in real hardware, RAM is initialized to FFFFFF
+//in real hardware, DRAM is initialized to FFFFFF
 //typedef enum { BAD_BLK, DIRTY_BLK, CLEAN_BLK, FREE_BLK } BlkStatus deriving (Bits, Eq);
 //BRAM 0000
 typedef enum { FREE_BLK, DIRTY_BLK, CLEAN_BLK, BAD_BLK } BlkStatus deriving (Bits, Eq);
@@ -112,14 +112,21 @@ interface BRAM_Wrapper;
 	method Action readReq(Bit#(14) addr);
 	method Action write(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
 	method ActionValue#(Bit#(512)) read();
+	
 	method Bool init_done;
+
+	// followings are for MAP/MGR management
+	method Action readReq2(Bit#(14) addr);
+	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
+	method ActionValue#(Bit#(512)) read2();
 endinterface
 
 module mkBRAMWrapper(BRAM_Wrapper);
 	BRAM_Configure cfg = defaultValue;
-	BRAM1PortBE#(Bit#(14), Bit#(512), 64) bram <- mkBRAM1ServerBE(cfg);
+	BRAM2PortBE#(Bit#(14), Bit#(512), 64) bram <- mkBRAM2ServerBE(cfg);
 
 	FIFO#(Bit#(512)) resp <- mkSizedFIFO(8);
+	FIFO#(Bit#(512)) resp2<- mkSizedFIFO(4);
 
 	function BRAMRequestBE#(Bit#(14), Bit#(512), 64) makeRequest(Bit#(64) write, Bit#(14) addr, Bit#(512) data);
 		return BRAMRequestBE{
@@ -131,6 +138,7 @@ module mkBRAMWrapper(BRAM_Wrapper);
 	endfunction
 
 	mkConnection( bram.portA.response, toPut(resp) ); 
+	mkConnection( bram.portB.response, toPut(resp2) ); 
 
 	method Action readReq(Bit#(14) addr);
 		bram.portA.request.put(makeRequest(0, addr, ?));
@@ -142,6 +150,19 @@ module mkBRAMWrapper(BRAM_Wrapper);
 
 	method ActionValue#(Bit#(512)) read;
 		let d <- toGet(resp).get;
+		return d;
+	endmethod
+
+	method Action readReq2(Bit#(14) addr);
+		bram.portB.request.put(makeRequest(0, addr, ?));
+	endmethod
+
+	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
+		bram.portB.request.put(makeRequest(byteen, addr, data));
+	endmethod
+
+	method ActionValue#(Bit#(512)) read2;
+		let d <- toGet(resp2).get;
 		return d;
 	endmethod
 
@@ -247,7 +268,7 @@ module mkFTL#(BRAM_Wrapper bram_ctrl)(FTLIfc);
 	endrule
 
 	rule readReqBlockTable ( (phase == P2) && (blkTableReqCnt<128) );
-		$display("[FTL.bsv] readReqBlockTable %d (bram_req)", blkTableReqCnt);
+		//$display("[FTL.bsv] readReqBlockTable %d (bram_req)", blkTableReqCnt);
 		blkTableReqCnt <= blkTableReqCnt+1;
 		Bit#(3) channel  = allocQ.first.bus;
 		Bit#(3) chip     = allocQ.first.chip;
@@ -270,7 +291,7 @@ module mkFTL#(BRAM_Wrapper bram_ctrl)(FTLIfc);
 	// each RAM read contains 32 block entries (total 128 RAM read -> 4096 blocks)
 	// Whenever we retreive 32 entries, we keep only the min at each position ( 31 ~ 0 )
 	rule readBlockTable0 ( (phase == P2) && (blkTableCnt<128) );
-		$display("[FTL.bsv] readBlockTable %d (bram_read)", blkTableCnt);
+		//$display("[FTL.bsv] readBlockTable %d (bram_read)", blkTableCnt);
 		blkTableCnt <= blkTableCnt+1;
 
 		let blkTable <- bram_ctrl.read;
