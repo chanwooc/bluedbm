@@ -107,9 +107,9 @@ int main(int argc, const char **argv)
 
 	for (int i = 0; i<4096; i++)
 		for (int j =0; j<64; j++)
-			blkmap[i][j] = 0xabab;
+			blkmap[i][j] = 0x0;
 
-	blkmap[0][0] = 0xbeef;
+	blkmap[0][1] = (1 << 14) | 32 ;
 
 	int ret;
 	while(1) {

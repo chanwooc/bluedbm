@@ -69,9 +69,21 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	Reg#(Bit#(32)) counter <- mkReg(0);
 	Reg#(Bit#(1)) init_done <- mkReg(0);
 
-	FIFO#(Bit#(32)) pendingReq <- mkSizedFIFO(20);
+	FIFO#(Bit#(32)) lastReqCnt <- mkSizedFIFO(10);
+	FIFO#(MapLockMode) mapReq <- mkSizedFIFO(10);
 	FIFO#(Bool) downloadReq <- mkSizedFIFO(4);
 	FIFO#(Bool) uploadReq <- mkSizedFIFO(4);
+
+
+	rule issueMapReq;
+		let d = mapReq.first;
+		mapReq.deq;
+		bram_ctrl.lockPortB(d);
+
+		if (d == UPLOAD) uploadReq.enq(True);
+		else downloadReq.enq(True);
+	endrule
+
 
 	//-------------
 	// DMA
@@ -114,7 +126,7 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	// Each burst beat 64bit = 8Byte 
 	// --> total 128*1024 = 2^17 beats
 	Integer dmaMapBeats = 128*1024;
-	Reg#(Bit#(32)) dmaReadBeatCnt <- mkReg(0);
+	Reg#(Bit#(20)) dmaReadBeatCnt <- mkReg(0);
 
 	rule pipeDmaRdData if (dmaReadReq2Resp.notEmpty);
 		let reS = getREServer(re, 0);
@@ -142,23 +154,24 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	rule dmaRdDone; // Upload done
 		dmaReadResp.deq;
 		indication.uploadDone;
+		bram_ctrl.unlockPortB;
 	endrule
 
 
 
 	// DMA Write
-	FIFOF#(Bool) mapReq <- mkSizedFIFOF(10);
+	FIFOF#(Bool) mapBramReq <- mkSizedFIFOF(10);
 	FIFOF#(Bool) dmaWriteReq2Resp <- mkSizedFIFOF(10);
 
 	// Total 1MB, each word: 512bit=64Byte -> total 14bit address
 	// Total 1MB, Each burst beat 64bit = 8Byte -> total 128*1024 beats
 	Integer mapDownloadReqs = 16*1024; // 2^14
-	Reg#(Bit#(32)) mapDownloadReqCnt <- mkReg(0);
-	Reg#(Bit#(32)) dmaWriteBeatCnt <- mkReg(0);
+	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
+	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
 
 	rule initUpload;
 		downloadReq.deq;
-		mapReq.enq(True);
+		mapBramReq.enq(True);
 		dmaWriteReq2Resp.enq(True);
 
 		let dmaCmd = MemengineCmd {
@@ -174,13 +187,13 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 		$display("[FTLBRAMTest.bsv] init dma write cmd issued");
 	endrule
 
-	rule reqMapData if (mapReq.notEmpty);
+	rule reqMapData if (mapBramReq.notEmpty);
 		//$display("[FTLBRAMTest.bsv] map read req for download issued: %d", mapDownloadReqCnt);
 		bram_ctrl.readReq2( truncate( mapDownloadReqCnt ) );
 
 		if (mapDownloadReqCnt == fromInteger(mapDownloadReqs - 1)) begin
 			mapDownloadReqCnt <= 0;
-			mapReq.deq;
+			mapBramReq.deq;
 		end else begin
 			mapDownloadReqCnt <= mapDownloadReqCnt+1;
 		end
@@ -218,6 +231,7 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 		dmaWriteReq2Resp.deq;
 
 		indication.downloadDone;
+		bram_ctrl.unlockPortB;
 	endrule
 
 
@@ -240,13 +254,13 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 		let valid = isValid(d);
 		let phyAddr = fromMaybe(?, d); 
 		$display("[FTLBRAMTest.bsv] read_indication: %d %d %d %d", phyAddr.bus, phyAddr.chip, phyAddr.block, phyAddr.page);
-		pendingReq.deq;
+		lastReqCnt.deq;
 		indication.translateDone( zeroExtend(pack(isValid(d))),
 								zeroExtend(phyAddr.bus),
 								zeroExtend(phyAddr.chip),
 								zeroExtend(phyAddr.block),
 								zeroExtend(phyAddr.page),
-								counter - pendingReq.first
+								counter - lastReqCnt.first
 		);
 	endrule
 
@@ -268,17 +282,17 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	interface FTLBRAMTestRequest request;
 		method Action translate(Bit#(32) lpa);
 			myFTL.translate(lpa);
-			pendingReq.enq(counter);
+			lastReqCnt.enq(counter);
 		endmethod
 		method Action setDmaRef(Bit#(32) map);//, Bit#(32) mgr);
 			dmaMapRef <= map;
 			//dmaMgrRef <= mgr;
 		endmethod
 		method Action downloadMap(); // Read Map&Mgr from FPGA to Host (DMA Write)
-			downloadReq.enq(True);
+			mapReq.enq(DOWNLOAD);
 		endmethod
 		method Action uploadMap(); // Upload Map&Mgr from host to FPGA (DMA Read)
-			uploadReq.enq(True);
+			mapReq.enq(UPLOAD);
 		endmethod
 	endinterface
 
@@ -296,7 +310,7 @@ endmodule
 //	let dram_ctrl <- mkDRAMWrapperSim;
 //
 //	Reg#(Bit#(32)) counter <- mkReg(0);
-//	FIFO#(Bit#(32)) pendingReq <- mkSizedFIFO(20);
+//	FIFO#(Bit#(32)) lastReqCnt <- mkSizedFIFO(20);
 //
 //	rule ledval;
 //		counter <= counter+1;
@@ -309,20 +323,20 @@ endmodule
 //		let d <- myFTL.get;
 //		let valid = isValid(d);
 //		let phyAddr = fromMaybe(?, d); 
-//		pendingReq.deq;
+//		lastReqCnt.deq;
 //		indication.translateDone( zeroExtend(pack(isValid(d))),
 //								zeroExtend(phyAddr.bus),
 //								zeroExtend(phyAddr.chip),
 //								zeroExtend(phyAddr.block),
 //								zeroExtend(phyAddr.page),
-//								counter - pendingReq.first
+//								counter - lastReqCnt.first
 //		);
 //	endrule
 //
 //	interface FTLBRAMTestRequest request;
 //		method Action translate(Bit#(32) lpa);
 //			myFTL.translate(lpa);
-//			pendingReq.enq(counter);
+//			lastReqCnt.enq(counter);
 //		endmethod
 //	endinterface
 //

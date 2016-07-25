@@ -76,6 +76,7 @@ typedef enum { FREE_BLK, DIRTY_BLK, CLEAN_BLK, BAD_BLK } BlkStatus deriving (Bit
 typedef enum { BAD_BLK, DIRTY_BLK, FREE_BLK, CLEAN_BLK } BlkStatus deriving (Bits, Eq);
 `endif
 
+
 typedef struct {
 	BlkStatus status; //2
 	Bit#(TSub#(16, SizeOf#(BlkStatus))) erase; //14
@@ -119,13 +120,19 @@ interface BRAM_Wrapper;
 	method Action readReq2(Bit#(14) addr);
 	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
 	method ActionValue#(Bit#(512)) read2();
+
+	// followings are for scheduling of map upload/download
+	method Action lockPortB(MapLockMode a);
+	method Action unlockPortB;
 endinterface
+
+typedef enum { UPLOAD, DOWNLOAD } MapLockMode deriving (Bits, Eq);
 
 module mkBRAMWrapper(BRAM_Wrapper);
 	BRAM_Configure cfg = defaultValue;
 	BRAM2PortBE#(Bit#(14), Bit#(512), 64) bram <- mkBRAM2ServerBE(cfg);
 
-	FIFO#(Bit#(512)) resp <- mkSizedFIFO(8);
+	FIFO#(Bit#(512)) resp <- mkSizedFIFO(4);
 	FIFO#(Bit#(512)) resp2<- mkSizedFIFO(4);
 
 	function BRAMRequestBE#(Bit#(14), Bit#(512), 64) makeRequest(Bit#(64) write, Bit#(14) addr, Bit#(512) data);
@@ -140,6 +147,9 @@ module mkBRAMWrapper(BRAM_Wrapper);
 	mkConnection( bram.portA.response, toPut(resp) ); 
 	mkConnection( bram.portB.response, toPut(resp2) ); 
 
+	// for map upload/download
+	FIFO#(MapLockMode) fifoLock <- mkFIFO; // True for write, False for read
+
 	method Action readReq(Bit#(14) addr);
 		bram.portA.request.put(makeRequest(0, addr, ?));
 	endmethod
@@ -153,33 +163,43 @@ module mkBRAMWrapper(BRAM_Wrapper);
 		return d;
 	endmethod
 
-	method Action readReq2(Bit#(14) addr);
+
+	method Action lockPortB(MapLockMode a);
+		fifoLock.enq(a);
+	endmethod
+
+	method Action unlockPortB;
+		fifoLock.clear;
+	endmethod
+
+	method Action readReq2(Bit#(14) addr) if (fifoLock.first==DOWNLOAD);
 		bram.portB.request.put(makeRequest(0, addr, ?));
 	endmethod
 
-	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
+	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen) if (fifoLock.first==UPLOAD);
 		bram.portB.request.put(makeRequest(byteen, addr, data));
 	endmethod
 
-	method ActionValue#(Bit#(512)) read2;
+	method ActionValue#(Bit#(512)) read2 if (fifoLock.first==DOWNLOAD);
 		let d <- toGet(resp2).get;
 		return d;
 	endmethod
 
 	method Bool init_done = True;
+
 endmodule
 
 module mkFTL#(BRAM_Wrapper bram_ctrl)(FTLIfc);
-	FIFO#(LPA) reqs <- mkSizedFIFO(32);
-	FIFO#(Maybe#(PhyAddr)) resps <- mkSizedFIFO(20);
+	FIFO#(LPA) reqs <- mkSizedFIFO(16);
+	FIFO#(Maybe#(PhyAddr)) resps <- mkSizedFIFO(16);
 
 	FIFO#(LogAddr) procQ <- mkFIFO;
 
 	Reg#(FTLPhase) phase <- mkReg(P0);
 
 	// for phase2 & 3
-	Reg#(Bit#(32)) blkTableReqCnt <- mkReg(0);
-	Reg#(Bit#(32)) blkTableCnt <- mkReg(0);
+	Reg#(Bit#(10)) blkTableReqCnt <- mkReg(0);
+	Reg#(Bit#(10)) blkTableCnt <- mkReg(0);
 	FIFO#(PhyAddr) allocQ <- mkFIFO;
 
 	// first 14-bit for phy_blk#, next 14-bit for erase#
@@ -283,7 +303,7 @@ module mkFTL#(BRAM_Wrapper bram_ctrl)(FTLIfc);
 			//compare only if FREE_BLK
 			case ( isValid(prevMin) && tpl_2(fromMaybe(?,prevMin)) <= blkEntry.erase )
 				True:  return prevMin;
-				False: return tagged Valid tuple2( truncate( blkTableCnt << 5  + fromInteger(idx) ) , blkEntry.erase);
+				False: return tagged Valid tuple2( zeroExtend( blkTableCnt ) << 5  + fromInteger(idx) , blkEntry.erase);
 			endcase
 		end
 	endfunction
