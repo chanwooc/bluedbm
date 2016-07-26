@@ -28,7 +28,7 @@ import ConnectalClocks::*;
 
 
 import AFTL::*;
-import BRAMWrapper::*;
+import BRAM_Wrapper::*;
 
 interface FTLBRAMTestRequest;
 	method Action translate(Bit#(32) lpa);
@@ -65,7 +65,7 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	///////////////////////////
 	/// BRAM instantiation
 	///////////////////////////
-	BRAMWrapper1 bram_ctrl <- mkBRAMWrapper1;
+	BRAM_Wrapper1 bram_ctrl <- mkBRAM_Wrapper1;
 
 	Reg#(Bit#(32)) counter <- mkReg(0);
 

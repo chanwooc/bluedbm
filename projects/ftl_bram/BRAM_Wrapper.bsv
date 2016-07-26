@@ -1,11 +1,11 @@
-// BRAM for FTL to support ONE flash card (BRAMWrapper1)
+// BRAM for FTL to support ONE flash card (BRAM_Wrapper1)
 
 import FIFO::*;
 import BRAM::*;
 import Connectable::*;
 import DefaultValue::*;
 
-interface BRAMWrapper1;
+interface BRAM_Wrapper1;
 	// followings are for FTL
 	method Action readReq(Bit#(14) addr);
 	method Action write(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
@@ -25,12 +25,12 @@ endinterface
 
 typedef enum { UPLOAD, DOWNLOAD } MapLockMode deriving (Bits, Eq);
 
-module mkBRAMWrapper1(BRAMWrapper1);
+module mkBRAM_Wrapper1(BRAM_Wrapper1);
 	BRAM_Configure cfg = defaultValue;
 	BRAM2PortBE#(Bit#(14), Bit#(512), 64) bram <- mkBRAM2ServerBE(cfg);
 
-	FIFO#(Bit#(512)) resp  <- mkFIFO; // TODO: mkSizedFIFO(?)
-	FIFO#(Bit#(512)) resp2 <- mkFIFO;
+	FIFO#(Bit#(512)) resp  <- mkSizedFIFO(4); // TODO: mkSizedFIFO(?)
+	FIFO#(Bit#(512)) resp2 <- mkSizedFIFO(4);
 
 	function BRAMRequestBE#(Bit#(14), Bit#(512), 64) makeRequest(Bit#(64) write, Bit#(14) addr, Bit#(512) data);
 		return BRAMRequestBE{

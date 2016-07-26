@@ -13,7 +13,7 @@ import GetPut::*;
 //import DRAMController::*;
 
 import BRAM::*;
-import BRAMWrapper::*;
+import BRAM_Wrapper::*;
 import Connectable::*;
 import DefaultValue::*;
 
@@ -112,9 +112,9 @@ endinterface
 typedef enum { P0, P1, P2, P3, P4, P5, P6, P7 } AFTLPhase deriving (Bits, Eq);
 
 
-module mkAFTL#(BRAMWrapper1 bram_ctrl)(AFTLIfc);
-	FIFO#(LPA) reqs <- mkSizedFIFO(8); // TODO: size?
-	FIFO#(Maybe#(PhyAddr)) resps <- mkSizedFIFO(8);
+module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
+	FIFO#(LPA) reqs <- mkSizedFIFO(16); // TODO: size?
+	FIFO#(Maybe#(PhyAddr)) resps <- mkSizedFIFO(16);
 
 	FIFO#(LogAddr) procQ <- mkFIFO;
 
