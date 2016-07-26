@@ -1,4 +1,4 @@
-package FTL;
+package AFTL;
 
 import FIFO::*;
 import Vector::*;
@@ -11,7 +11,9 @@ import GetPut::*;
 //import DDR3Controller::*;
 //import DDR3Common::*;
 //import DRAMController::*;
+
 import BRAM::*;
+import BRAMWrapper::*;
 import Connectable::*;
 import DefaultValue::*;
 
@@ -21,12 +23,12 @@ import HostInterface::*;
 import Clocks::*;
 import ConnectalClocks::*;
 
-//typedef NUM_TOTAL_CHIPS BlocksPerSegment; 						// 8*8=64=2^6
-//typedef TMul#(PagesPerBlock, BlocksPerSegment) PagesPerSegment;	// 64*256=16384=2^14
-//typedef BlocksPerCE NumSegment;									// 4096
-typedef 64 BlocksPerSegment; 						// 8*8=64=2^6
-typedef 16384 PagesPerSegment;	// 64*256=16384=2^14
-typedef 4096 NumSegment;									// 4096
+//typedef NUM_TOTAL_CHIPS BlocksPerSegment;                        // 8*8=64=2^6
+//typedef TMul#(PagesPerBlock, BlocksPerSegment) PagesPerSegment;  // 64*256=16384=2^14
+//typedef BlocksPerCE NumSegment;                                  // 4096
+typedef 64 BlocksPerSegment;
+typedef 16384 PagesPerSegment;
+typedef 4096 NumSegment;
 
 typedef TLog#(BlocksPerSegment) LogicalBlockSz; // 6-bit
 //typedef TLog#(PagesPerBlock) PageOffsetSz;      // 8-bit
@@ -102,100 +104,21 @@ function LogAddr getLogAddr(LPA lpa);
 	};
 endfunction
 
-interface FTLIfc;
+interface AFTLIfc;
 	method Action translate(LPA lpa);
 	method ActionValue#(Maybe#(PhyAddr)) get;
 endinterface
 
-typedef enum { P0, P1, P2, P3, P4, P5, P6, P7 } FTLPhase deriving (Bits, Eq);
-
-interface BRAM_Wrapper;
-	method Action readReq(Bit#(14) addr);
-	method Action write(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
-	method ActionValue#(Bit#(512)) read();
-	
-	method Bool init_done;
-
-	// followings are for MAP/MGR management
-	method Action readReq2(Bit#(14) addr);
-	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
-	method ActionValue#(Bit#(512)) read2();
-
-	// followings are for scheduling of map upload/download
-	method Action lockPortB(MapLockMode a);
-	method Action unlockPortB;
-endinterface
-
-typedef enum { UPLOAD, DOWNLOAD } MapLockMode deriving (Bits, Eq);
-
-module mkBRAMWrapper(BRAM_Wrapper);
-	BRAM_Configure cfg = defaultValue;
-	BRAM2PortBE#(Bit#(14), Bit#(512), 64) bram <- mkBRAM2ServerBE(cfg);
-
-	FIFO#(Bit#(512)) resp <- mkSizedFIFO(4);
-	FIFO#(Bit#(512)) resp2<- mkSizedFIFO(4);
-
-	function BRAMRequestBE#(Bit#(14), Bit#(512), 64) makeRequest(Bit#(64) write, Bit#(14) addr, Bit#(512) data);
-		return BRAMRequestBE{
-			writeen: write,
-			responseOnWrite: False,
-			address: addr,
-			datain: data
-		};
-	endfunction
-
-	mkConnection( bram.portA.response, toPut(resp) ); 
-	mkConnection( bram.portB.response, toPut(resp2) ); 
-
-	// for map upload/download
-	FIFO#(MapLockMode) fifoLock <- mkFIFO; // True for write, False for read
-
-	method Action readReq(Bit#(14) addr);
-		bram.portA.request.put(makeRequest(0, addr, ?));
-	endmethod
-
-	method Action write(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
-		bram.portA.request.put(makeRequest(byteen, addr, data));
-	endmethod
-
-	method ActionValue#(Bit#(512)) read;
-		let d <- toGet(resp).get;
-		return d;
-	endmethod
+typedef enum { P0, P1, P2, P3, P4, P5, P6, P7 } AFTLPhase deriving (Bits, Eq);
 
 
-	method Action lockPortB(MapLockMode a);
-		fifoLock.enq(a);
-	endmethod
-
-	method Action unlockPortB;
-		fifoLock.clear;
-	endmethod
-
-	method Action readReq2(Bit#(14) addr) if (fifoLock.first==DOWNLOAD);
-		bram.portB.request.put(makeRequest(0, addr, ?));
-	endmethod
-
-	method Action write2(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen) if (fifoLock.first==UPLOAD);
-		bram.portB.request.put(makeRequest(byteen, addr, data));
-	endmethod
-
-	method ActionValue#(Bit#(512)) read2 if (fifoLock.first==DOWNLOAD);
-		let d <- toGet(resp2).get;
-		return d;
-	endmethod
-
-	method Bool init_done = True;
-
-endmodule
-
-module mkFTL#(BRAM_Wrapper bram_ctrl)(FTLIfc);
-	FIFO#(LPA) reqs <- mkSizedFIFO(16);
-	FIFO#(Maybe#(PhyAddr)) resps <- mkSizedFIFO(16);
+module mkAFTL#(BRAMWrapper1 bram_ctrl)(AFTLIfc);
+	FIFO#(LPA) reqs <- mkSizedFIFO(8); // TODO: size?
+	FIFO#(Maybe#(PhyAddr)) resps <- mkSizedFIFO(8);
 
 	FIFO#(LogAddr) procQ <- mkFIFO;
 
-	Reg#(FTLPhase) phase <- mkReg(P0);
+	Reg#(AFTLPhase) phase <- mkReg(P0);
 
 	// for phase2 & 3
 	Reg#(Bit#(10)) blkTableReqCnt <- mkReg(0);
@@ -454,4 +377,4 @@ module mkFTL#(BRAM_Wrapper bram_ctrl)(FTLIfc);
 	method Action translate(LPA lpa) = reqs.enq(lpa);
 	method ActionValue#(Maybe#(PhyAddr)) get = toGet(resps).get;
 endmodule
-endpackage: FTL
+endpackage: AFTL

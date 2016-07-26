@@ -27,7 +27,8 @@ import Clocks::*;
 import ConnectalClocks::*;
 
 
-import FTL::*;
+import AFTL::*;
+import BRAMWrapper::*;
 
 interface FTLBRAMTestRequest;
 	method Action translate(Bit#(32) lpa);
@@ -64,10 +65,9 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	///////////////////////////
 	/// BRAM instantiation
 	///////////////////////////
-	BRAM_Wrapper bram_ctrl <- mkBRAMWrapper;
+	BRAMWrapper1 bram_ctrl <- mkBRAMWrapper1;
 
 	Reg#(Bit#(32)) counter <- mkReg(0);
-	Reg#(Bit#(1)) init_done <- mkReg(0);
 
 	FIFO#(Bit#(32)) lastReqCnt <- mkSizedFIFO(10);
 	FIFO#(MapLockMode) mapReq <- mkSizedFIFO(10);
@@ -138,7 +138,7 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 		// dmaReadBeatCnt[2:0] << 6: Data-shift unit = 64 bit = 2^6 bit
 		// dmaReadBeatCnt[2:0] << 3: Mask-shift unit = 8 Byte = 2^3 Byte
 
-		bram_ctrl.write2( truncate  ( dmaReadBeatCnt >> 3 ),
+		bram_ctrl.writeB( truncate  ( dmaReadBeatCnt >> 3 ),
 						  zeroExtend( d.data ) << {dmaReadBeatCnt[2:0], 6'b0} ,
 						  zeroExtend( 64'b11111111 << { dmaReadBeatCnt[2:0], 3'b0}) );
 
@@ -189,7 +189,7 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 
 	rule reqMapData if (mapBramReq.notEmpty);
 		//$display("[FTLBRAMTest.bsv] map read req for download issued: %d", mapDownloadReqCnt);
-		bram_ctrl.readReq2( truncate( mapDownloadReqCnt ) );
+		bram_ctrl.readReqB( truncate( mapDownloadReqCnt ) );
 
 		if (mapDownloadReqCnt == fromInteger(mapDownloadReqs - 1)) begin
 			mapDownloadReqCnt <= 0;
@@ -203,7 +203,7 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 
 	rule pipeDmaWrData1;
 		//$display("[FTLBRAMTest.bsv] map read data for download");
-		let d <- bram_ctrl.read2;
+		let d <- bram_ctrl.readB;
 		dmaWrDataBuf.enq(d);
 	endrule
 
@@ -239,15 +239,14 @@ module mkFTLBRAMTest#(HostInterface host, FTLBRAMTestIndication indication)(FTLB
 	// Misc
 	//----------
 
-	rule ledval;
+	rule counting;
 		counter <= counter+1;
-		init_done <= pack(bram_ctrl.init_done);
 	endrule
 
 	//---------
 	// FTL
 	//---------
-	FTLIfc myFTL <- mkFTL(bram_ctrl);
+	AFTLIfc myFTL <- mkAFTL(bram_ctrl);
 
 	rule read_indication;
 		let d <- myFTL.get;
