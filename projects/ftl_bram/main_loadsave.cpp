@@ -105,11 +105,36 @@ int main(int argc, const char **argv)
 
 	uint arg1;
 
-	for (int i = 0; i<4096; i++)
-		for (int j =0; j<64; j++)
+	int i,j,k;
+	//uint16_t (*blkmap)[NUM_CHANNELS*NUM_CHIPS]; // 4096*64
+	for (i = 0; i<4096; i++)
+		for (j =0; j<64; j++)
+#ifndef BSIM
 			blkmap[i][j] = 0x0;
+#else
+			blkmap[i][j] = 0x8000;
+#endif
+
+	//uint16_t (*blkmgr)[NUM_CHIPS][NUM_BLOCKS];  // 8*8*4096
+	for (i = 0; i<8; i++)
+		for (j=0; j<8; j++)
+			for (k=0; k<4096; k++)
+#ifndef BSIM
+				blkmgr[i][j][k] = 0xCC;
+#else
+				blkmgr[i][j][k] = 0x80CC;
+#endif
+
 
 	blkmap[0][1] = (1 << 14) | 32 ;
+
+#ifndef BSIM
+	blkmgr[0][0][31] = 0xAB;
+	blkmgr[0][0][24] = 0xAF;
+#else
+	blkmgr[0][0][31] = 0x80AB;
+	blkmgr[0][0][24] = 0x80AF;
+#endif
 
 	int ret;
 	while(1) {

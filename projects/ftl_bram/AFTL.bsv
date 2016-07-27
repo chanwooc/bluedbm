@@ -54,8 +54,7 @@ typedef struct {
 typedef FlashAddr PhyAddr;
 
 `ifndef BSIM
-//in real hardware, RAM is initialized to FFFFFF
-//typedef enum { TRIM, DEAD, ALLOCATED, NOT_ALLOCATED } MapStatus deriving (Bits, Eq);
+//DRAM FFFF
 //BRAM 0000
 typedef enum { NOT_ALLOCATED, ALLOCATED, DEAD } MapStatus deriving (Bits, Eq);
 `else
@@ -69,8 +68,7 @@ typedef struct {
 } MapEntry deriving (Bits, Eq); // 16-bit (2-bytes) mapping entry
 
 `ifndef BSIM
-//in real hardware, DRAM is initialized to FFFFFF
-//typedef enum { BAD_BLK, DIRTY_BLK, CLEAN_BLK, FREE_BLK } BlkStatus deriving (Bits, Eq);
+//DRAM FFFF
 //BRAM 0000
 typedef enum { FREE_BLK, DIRTY_BLK, CLEAN_BLK, BAD_BLK } BlkStatus deriving (Bits, Eq);
 `else
@@ -109,7 +107,7 @@ interface AFTLIfc;
 	method ActionValue#(Maybe#(PhyAddr)) get;
 endinterface
 
-typedef enum { P0, P1, P2, P3, P4, P5, P6, P7 } AFTLPhase deriving (Bits, Eq);
+typedef enum { P0, P1, P2, P3, P4, P5, P6, P7, P8 } AFTLPhase deriving (Bits, Eq);
 
 
 module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
@@ -127,11 +125,15 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 
 	// first 14-bit for phy_blk#, next 14-bit for erase#
 	Vector#(32, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries0 <- replicateM(mkReg(tagged Invalid));
-	Vector#(16, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries1 <- replicateM(mkReg(tagged Invalid));
-	Vector#(8, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries2 <- replicateM(mkReg(tagged Invalid));
-	Vector#(4, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries3 <- replicateM(mkReg(tagged Invalid));
-	Vector#(2, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries4 <- replicateM(mkReg(tagged Invalid));
+	Vector#(16, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries1 = take(minEntries0);
+	Vector#(8, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries2  = take(minEntries0);
+	Vector#(4, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries3  = take(minEntries0);
+	Vector#(2, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries4  = take(minEntries0);
 
+//	Vector#(16, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries1 <- replicateM(mkReg(tagged Invalid));
+//	Vector#(8, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries2  <- replicateM(mkReg(tagged Invalid));
+//	Vector#(4, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries3  <- replicateM(mkReg(tagged Invalid));
+//	Vector#(2, Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14))))) minEntries4  <- replicateM(mkReg(tagged Invalid));
 	Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14)))) blkToAlloc <- mkReg(tagged Invalid);
 
 	rule readReqMapTable (phase == P0) ;
@@ -178,7 +180,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 				};
 				allocQ.enq(phyAddr);
 				$display("[FTL.bsv] bram read @ readMapTable, NOT_ALLOCATED");
-				$display("[FTL.bsv] phyAddr: %d %d %d %d", phyAddr.bus, phyAddr.chip, phyAddr.block, phyAddr.page);
+				$display("[FTL.bsv] phyAddr: %d %d x %d", phyAddr.bus, phyAddr.chip, phyAddr.page);
 			end
 			ALLOCATED:
 			begin
@@ -224,9 +226,11 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 			return prevMin;
 		else begin
 			//compare only if FREE_BLK
+			Bit#(14) minBlk = (zeroExtend( blkTableCnt ) << 5) + fromInteger(idx);
+			//$display("[func] ");
 			case ( isValid(prevMin) && tpl_2(fromMaybe(?,prevMin)) <= blkEntry.erase )
 				True:  return prevMin;
-				False: return tagged Valid tuple2( zeroExtend( blkTableCnt ) << 5  + fromInteger(idx) , blkEntry.erase);
+				False: return tagged Valid tuple2( minBlk , blkEntry.erase);
 			endcase
 		end
 	endfunction
@@ -234,14 +238,18 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 	// each RAM read contains 32 block entries (total 128 RAM read -> 4096 blocks)
 	// Whenever we retreive 32 entries, we keep only the min at each position ( 31 ~ 0 )
 	rule readBlockTable0 ( (phase == P2) && (blkTableCnt<128) );
-		//$display("[FTL.bsv] readBlockTable %d (bram_read)", blkTableCnt);
-		blkTableCnt <= blkTableCnt+1;
-
 		let blkTable <- bram_ctrl.read;
+		blkTableCnt <= blkTableCnt+1;
+		
+		$display("[FTL.bsv] readBlockTable0_1 %x (bram_read)", blkTable);
+
 		Vector#(32, BlkEntry) blkEntries = unpack(blkTable);
 		Vector#(32, Integer) indices = genVector();
 		
 		let newMinEntries = zipWith3( getMinEntries, readVReg(minEntries0), blkEntries, indices);
+		Bit#(14) minBlk = (zeroExtend( blkTableCnt ) << 5) + fromInteger(indices[1]);
+		$display("[FTL.bsv] readBlockTable0_2  newminEntries[1]: blkTableCnt: %d, index: %d, calc_blk: %d, blk: %d, erase: %x",
+		                                               blkTableCnt, indices[1], minBlk, tpl_1(fromMaybe(?,newMinEntries[1])), tpl_2(fromMaybe(?,newMinEntries[1])));
 		writeVReg(minEntries0, newMinEntries);
 	endrule
 
@@ -287,6 +295,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 			minVec[i] = min2to1( takeAt(2*i, readVReg(minEntries0)) );
 		end
 
+		$display("[FTL.bsv] readBlockTable1 %x", minVec);
 		writeVReg(minEntries1, minVec);
 		phase <= P3;
 	endrule
@@ -299,6 +308,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 			minVec[i] = min2to1( takeAt(2*i, readVReg(minEntries1)) );
 		end
 
+		$display("[FTL.bsv] readBlockTable2 %x", minVec);
 		writeVReg(minEntries2, minVec);
 		phase <= P4;
 	endrule
@@ -311,6 +321,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 			minVec[i] = min2to1( takeAt(2*i, readVReg(minEntries2)) );
 		end
 
+		$display("[FTL.bsv] readBlockTable3 %x", minVec);
 		writeVReg(minEntries3, minVec);
 		phase <= P5;
 	endrule
@@ -322,6 +333,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 			minVec[i] = min2to1( takeAt(2*i, readVReg(minEntries2)) );
 		end
 
+		$display("[FTL.bsv] readBlockTable4 %x", minVec);
 		writeVReg(minEntries4, minVec);
 		phase <= P6;
 	endrule
@@ -329,6 +341,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 	rule readBlockTable5 ( phase == P6 );
 		Maybe#(Tuple2#(Bit#(14), Bit#(14))) minEntry = min2to1( readVReg(minEntries4) );
 
+		$display("[FTL.bsv] readBlockTable5 isValid: %d Block: %d Erase: %x", isValid(minEntry), tpl_1(fromMaybe(?, minEntry)), tpl_2(fromMaybe(?, minEntry)));
 		blkToAlloc <= minEntry;
 		phase <= P7;
 	endrule
@@ -349,29 +362,60 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 	//	phase <= P3;
 	//endrule
 
-	rule updateBlockTable ( (phase == P7) );
-		procQ.deq;
-		allocQ.deq;
-
-		phase <= P0;
+	rule updateMapTable ( (phase == P7) );
 		if ( isValid(blkToAlloc) ) begin
-			// result to resps
+			phase <= P8;
+
 			let logAddr = procQ.first;
 			let phyAddr = allocQ.first;
 			phyAddr.block = zeroExtend(tpl_1(fromMaybe(?, blkToAlloc)));
-			$display("[FTL.bsv] update-phyAddr: %d %d %d %d", phyAddr.bus, phyAddr.chip, phyAddr.block, phyAddr.page);
-			resps.enq(tagged Valid phyAddr);
-
-			// update map
-			//bram_ctrl.readReq( zeroExtend({ 1'b0, logAddr.segment, logAddr.block[5], 3'b0 }) );
+			// update mapping
 			Bit#(10) idx = zeroExtend(logAddr.block[4:0]) << 4;
 			MapEntry newEntry = MapEntry{status: ALLOCATED, block: truncate(phyAddr.block)};
 			bram_ctrl.write( zeroExtend({ 1'b0, logAddr.segment, logAddr.block[5] }),
 							 zeroExtend(pack(newEntry)) << idx ,
 							 zeroExtend(  64'b11 << {logAddr.block[4:0],1'b0}  ) );
+		
+			$display("[FTL.bsv] updateMapAddr: %x", ({ 1'b0, logAddr.segment, logAddr.block[5] }));
+			$display("[FTL.bsv] updateMapData: %x", (pack(newEntry)) << idx );
+			$display("[FTL.bsv] updateMapMast: %x", 64'b11 << {logAddr.block[4:0],1'b0});
+
+			$display("[FTL.bsv] updateMap: %d %d %d %d", phyAddr.bus, phyAddr.chip, phyAddr.block, phyAddr.page);
 		end else begin
+			phase <= P0;
+			procQ.deq;
+			allocQ.deq;
+
 			resps.enq(tagged Invalid);
 		end
+	endrule
+
+	rule updateBlockTable ( (phase == P8) );
+		phase <= P0;
+		procQ.deq;
+		allocQ.deq;
+
+		let phyAddr = allocQ.first;
+		phyAddr.block = zeroExtend(tpl_1(fromMaybe(?, blkToAlloc)));
+
+		Bit#(3) channel  = phyAddr.bus;
+		Bit#(3) chip     = phyAddr.chip;
+		Bit#(14) block   = tpl_1(fromMaybe(?, blkToAlloc));
+		Bit#(14) erase   = tpl_2(fromMaybe(?, blkToAlloc));
+
+		// result to resps
+		resps.enq(tagged Valid phyAddr);
+
+		// update block table
+		Bit#(10) idx = zeroExtend(block[4:0]) << 4;
+		BlkEntry newEntry = BlkEntry{status: CLEAN_BLK, erase: erase};
+		bram_ctrl.write( zeroExtend({ 1'b1, channel, chip, block[11:5] }),
+						 zeroExtend(pack(newEntry)) << idx ,
+						 zeroExtend(  64'b11 << {block[4:0],1'b0}  ) );
+
+		$display("[FTL.bsv] updateMgrAddr: %x", ({ 1'b1, channel, chip, block[11:5] }));
+		$display("[FTL.bsv] updateMgrData: %x", (pack(newEntry)) << idx );
+		$display("[FTL.bsv] updateMgrMast: %x", 64'b11 << {block[4:0],1'b0});
 	endrule
 
 	method Action translate(LPA lpa) = reqs.enq(lpa);
