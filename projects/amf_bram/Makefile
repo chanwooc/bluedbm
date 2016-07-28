@@ -1,0 +1,54 @@
+CONNECTALDIR?=../../tools/connectal/
+S2H_INTERFACE = FlashRequest:MainIfc.request
+H2S_INTERFACE = MainIfc:FlashIndication:host.derivedClock,host.derivedReset
+MEM_READ_INTERFACES = lMainIfc.dmaReadClient
+MEM_WRITE_INTERFACES = lMainIfc.dmaWriteClient
+
+PIN_TYPE=Top_Pins
+PIN_TYPE_INCLUDE=TopPins
+AUTOTOP = --interface pins:MainIfc.pins
+
+# specific for ZYNQ - Four Masters
+NUMBER_OF_MASTERS=4
+PLATFORM_NUMBER_OF_MASTERS=4
+NUMBER_OF_ENGINES=9
+
+BSVFILES = Main.bsv  \
+	../aftl_bram/Dummy.bsv \
+	../../xilinx/aurora_8b10b_zynq/AuroraImportZynq.bsv \
+	../../src/lib/AuroraCommon.bsv \
+	../../controller/src/common/FlashBusModel.bsv \
+	../../controller/src/model_zynq/FlashCtrlModel.bsv \
+	../../controller/src/hw_zynq/FlashCtrlZynq.bsv
+
+CPPFILES=main.cpp
+
+CONNECTALFLAGS += -D DataBusWidth=64
+CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)
+CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS
+CONNECTALFLAGS += --mainclockperiod=5 --derivedclockperiod=5
+CONNECTALFLAGS += --bsvpath=.././src/lib
+
+ifeq ($(BOARD), bluesim)
+CONNECTALFLAGS += -D BSIM
+else ifeq ($(BOARD), verilator)
+CONNECTALFLAGS += -D BSIM
+else
+NOHOST_XDC = ../../misc/nohost.xdc
+
+CONNECTALFLAGS += \
+	--verilog ../../xilinx/aurora_8b10b_zynq/ \
+	--xci $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci \
+	--constraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
+	--constraint $(NOHOST_XDC) \
+	--implconstraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
+	--implconstraint $(NOHOST_XDC) 
+
+AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq_stub.v
+prebuild:: $(AURORA_INTRA)
+
+$(AURORA_INTRA): ../../core-scripts/synth-aurora-intra-zynq.tcl
+	(cd $(BOARD); vivado -mode batch -source ../../../core-scripts/synth-aurora-intra-zynq.tcl)
+endif
+
+include $(CONNECTALDIR)/Makefile.connectal

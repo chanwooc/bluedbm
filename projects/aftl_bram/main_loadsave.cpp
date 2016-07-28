@@ -27,7 +27,6 @@ typedef unsigned int uint;
 size_t blkmapAlloc_sz = sizeof(uint16_t) * NUM_SEGMENTS * NUM_LOGBLKS;
 int blkmapAlloc;
 uint ref_blkmapAlloc;
-//void* mapPointer, blkmgrPointer;
 uint16_t (*blkmap)[NUM_CHANNELS*NUM_CHIPS]; // 4096*64
 uint16_t (*blkmgr)[NUM_CHIPS][NUM_BLOCKS];  // 8*8*4096
 

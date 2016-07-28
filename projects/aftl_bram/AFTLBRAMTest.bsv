@@ -114,7 +114,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 							burstLen: 128
 						};
 
-		let reS = getREServer(re, 0);
+		let reS = getREServer(re, 8);
 		reS.request.put(dmaCmd);
 
 		$display("[AFTLBRAMTest.bsv] init dma read cmd issued");
@@ -130,7 +130,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 	Reg#(Bit#(20)) dmaReadBeatCnt <- mkReg(0);
 
 	rule pipeDmaRdData if (dmaReadReq2Resp.notEmpty);
-		let reS = getREServer(re, 0);
+		let reS = getREServer(re, 8);
 		let d <- toGet(reS.data).get; //Each beat is 64 bit = 8 Byte wide
 
 		// BRAM: 64 Byte-word addressing (14 bit address -> 64 Byte-word)
@@ -182,7 +182,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 							burstLen: 128
 						};
 
-		let weS = getWEServer(we, 0);
+		let weS = getWEServer(we, 8);
 		weS.request.put(dmaCmd);
 
 		$display("[AFTLBRAMTest.bsv] init dma write cmd issued");
@@ -215,7 +215,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 
 		Bit#(DataBusWidth) data = truncate( buffered_data >> { dmaWrPhase, 6'b0 } );
 
-		let weS = getWEServer(we, 0);
+		let weS = getWEServer(we, 8);
 		weS.data.enq(data);
 
 		if (dmaWrPhase == 7) begin
@@ -227,7 +227,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 
 
 	rule dmaWrDone;
-		let weS = getWEServer(we, 0);
+		let weS = getWEServer(we, 8);
 		let dummy <- weS.done.get;
 		dmaWriteReq2Resp.deq;
 

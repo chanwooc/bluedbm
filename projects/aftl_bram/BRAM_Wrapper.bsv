@@ -29,8 +29,8 @@ module mkBRAM_Wrapper1(BRAM_Wrapper1);
 	BRAM_Configure cfg = defaultValue;
 	BRAM2PortBE#(Bit#(14), Bit#(512), 64) bram <- mkBRAM2ServerBE(cfg);
 
-	FIFO#(Bit#(512)) resp  <- mkSizedFIFO(4); // TODO: mkSizedFIFO(?)
-	FIFO#(Bit#(512)) resp2 <- mkSizedFIFO(4);
+	FIFO#(Bit#(512)) resp  <- mkSizedFIFO(16); // TODO: mkSizedFIFO(?)
+	FIFO#(Bit#(512)) resp2 <- mkSizedFIFO(16);
 
 	function BRAMRequestBE#(Bit#(14), Bit#(512), 64) makeRequest(Bit#(64) write, Bit#(14) addr, Bit#(512) data);
 		return BRAMRequestBE{

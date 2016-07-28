@@ -10,7 +10,7 @@ CPPFILES = main_loadsave.cpp
 # specific for ZYNQ - Four Masters
 NUMBER_OF_MASTERS=4
 PLATFORM_NUMBER_OF_MASTERS=4
-NUMBER_OF_ENGINES=8
+NUMBER_OF_ENGINES=9 # 8 for flash 1 for map
 
 CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)
