@@ -1,17 +1,17 @@
 CONNECTALDIR?=../../tools/connectal/
-S2H_INTERFACE = FlashRequest:MainIfc.request
-H2S_INTERFACE = MainIfc:FlashIndication:host.derivedClock,host.derivedReset
-MEM_READ_INTERFACES = lMainIfc.dmaReadClient
-MEM_WRITE_INTERFACES = lMainIfc.dmaWriteClient
+S2H_INTERFACES = FlashRequest:Main.request
+H2S_INTERFACES = Main:FlashIndication:host.derivedClock,host.derivedReset
+MEM_READ_INTERFACES = lMain.dmaReadClient
+MEM_WRITE_INTERFACES = lMain.dmaWriteClient
 
 PIN_TYPE=Top_Pins
 PIN_TYPE_INCLUDE=TopPins
-AUTOTOP = --interface pins:MainIfc.pins
+AUTOTOP = --interface pins:Main.pins
 
 # specific for ZYNQ - Four Masters
 NUMBER_OF_MASTERS=4
 PLATFORM_NUMBER_OF_MASTERS=4
-NUMBER_OF_ENGINES=9
+NUMBER_OF_ENGINES=4
 
 BSVFILES = Main.bsv  \
 	../aftl_bram/Dummy.bsv \
@@ -27,7 +27,6 @@ CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)
 CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS
 CONNECTALFLAGS += --mainclockperiod=5 --derivedclockperiod=5
-CONNECTALFLAGS += --bsvpath=.././src/lib
 
 ifeq ($(BOARD), bluesim)
 CONNECTALFLAGS += -D BSIM

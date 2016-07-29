@@ -132,6 +132,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 	rule pipeDmaRdData if (dmaReadReq2Resp.notEmpty);
 		let reS = getREServer(re, 8);
 		let d <- toGet(reS.data).get; //Each beat is 64 bit = 8 Byte wide
+		$display("[AFTLBRAMTest.bsv] dma %dth read", dmaReadBeatCnt);
 
 		// BRAM: 64 Byte-word addressing (14 bit address -> 64 Byte-word)
 		// 8 Beats per each address
@@ -170,7 +171,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
 	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
 
-	rule initUpload;
+	rule initDownload;
 		downloadReq.deq;
 		mapBramReq.enq(True);
 		dmaWriteReq2Resp.enq(True);
@@ -189,7 +190,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 	endrule
 
 	rule reqMapData if (mapBramReq.notEmpty);
-		//$display("[AFTLBRAMTest.bsv] map read req for download issued: %d", mapDownloadReqCnt);
+		$display("[AFTLBRAMTest.bsv] %dth req", mapDownloadReqCnt);
 		bram_ctrl.readReqB( truncate( mapDownloadReqCnt ) );
 
 		if (mapDownloadReqCnt == fromInteger(mapDownloadReqs - 1)) begin
@@ -288,7 +289,7 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 			default: op=3;
 		endcase
 
-		$display("[AFTLBRAMTest.bsv] Failed %u", op );
+		$display("[AFTLBRAMTest.bsv] Failed %d", op );
 		lastReqCnt.deq;
 		indication.translateFailure( zeroExtend(op),
 								counter - lastReqCnt.first

@@ -57,9 +57,10 @@ import FlashCtrlModel::*;
 
 import AFTL::*;
 import BRAM_Wrapper::*;
+import TopPins::*;
 
 //import MainTypes::*;
-typedef 9 NUM_ENG_PORTS;
+typedef 8 NUM_ENG_PORTS;
 
 interface FlashRequest;
 	// memory offset
@@ -169,18 +170,18 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
 
 	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_ENG_PORTS,NumReadClients))) rengine, Integer idx ) ;
-		let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumReadClients));
-		let idxEngine = idx / numEngineServer;
-		let idxServer = idx % numEngineServer;
+		let numEngineServer = valueOf(NumReadClients));
+		let idxEngine = idx % numEngineServer;
+		let idxServer = idx / numEngineServer;
 
 		return rengine[idxEngine].readServers[idxServer];
 		//return rengine[idx].readServers[0];
 	endfunction
 	
 	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) wengine, Integer idx ) ;
-		let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumWriteClients));
-		let idxEngine = idx / numEngineServer;
-		let idxServer = idx % numEngineServer;
+		let numEngineServer = valueOf(NumWriteClients);
+		let idxEngine = idx % numEngineServer;
+		let idxServer = idx / numEngineServer;
 
 		return wengine[idxEngine].writeServers[idxServer];
 		//return wengine[idx].writeServers[0];
@@ -191,9 +192,6 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 		return (off<< dmaAllocPageSizeLog);
 	endfunction
 
-	rule incCycle;
-		cycleCnt <= cycleCnt + 1;
-	endrule
 
 	rule driveFlashCmd; // (started);
 		let cmd = flashCmdQ.first;
@@ -226,8 +224,6 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaWrReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO make bigger?
 	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaWriteReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));//TODO make bigger?
 	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFO);
-
-//	Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) dmaWrReqCnts <- replicateM(mkReg(0));
 
 	Vector#(NUM_ENG_PORTS, Reg#(TagT)) currTags <- replicateM(mkReg(0));
 
@@ -512,7 +508,7 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 							burstLen: 128
 						};
 
-		let reS = getREServer(re, 8);
+		let reS = getREServer(re, 0);
 		reS.request.put(dmaCmd);
 
 		$display("[AFTLBRAMTest.bsv] init dma read cmd issued");
@@ -527,9 +523,17 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 	Integer dmaMapBeats = 128*1024;
 	Reg#(Bit#(20)) ftlReadBeatCnt <- mkReg(0);
 
+	FIFO#(Tuple3#(Bit#(14), Bit#(512), Bit#(64))) tmpFifo <- mkSizedFIFO(16);
+
+	rule incCycle;
+		cycleCnt <= cycleCnt + 1;
+		$display("[tick%d] RE notEmpty %d", cycleCnt, (getREServer(re,0).data).notEmpty);
+	endrule
+
 	rule pipeFTLRdData if (ftlReadReq2Resp.notEmpty);
-		let reS = getREServer(re, 8);
+		let reS = getREServer(re, 0);
 		let d <- toGet(reS.data).get; //Each beat is 64 bit = 8 Byte wide
+		$display("[tick%d] dmaGet %d", cycleCnt, ftlReadBeatCnt);
 
 		// BRAM: 64 Byte-word addressing (14 bit address -> 64 Byte-word)
 		// 8 Beats per each address
@@ -537,9 +541,12 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 		// ftlReadBeatCnt[2:0] << 6: Data-shift unit = 64 bit = 2^6 bit
 		// ftlReadBeatCnt[2:0] << 3: Mask-shift unit = 8 Byte = 2^3 Byte
 
-		bram_ctrl.writeB( truncate  ( ftlReadBeatCnt >> 3 ),
+		tmpFifo.enq( tuple3( truncate  ( ftlReadBeatCnt >> 3 ),
 						  zeroExtend( d.data ) << {ftlReadBeatCnt[2:0], 6'b0} ,
-						  zeroExtend( 64'b11111111 << { ftlReadBeatCnt[2:0], 3'b0}) );
+						  zeroExtend( 64'b11111111 << { ftlReadBeatCnt[2:0], 3'b0})  ) );
+//		bram_ctrl.writeB( truncate  ( ftlReadBeatcnt >> 3 ),
+//						  zeroExtend( d.data ) << {ftlReadBeatCnt[2:0], 6'b0} ,
+//						  zeroExtend( 64'b11111111 << { ftlReadBeatCnt[2:0], 3'b0}) );
 
 		if (ftlReadBeatCnt == fromInteger(dmaMapBeats - 1)) begin
 			ftlReadBeatCnt <= 0;
@@ -548,6 +555,14 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 		end else begin
 			ftlReadBeatCnt <= ftlReadBeatCnt+1;
 		end
+	endrule
+
+	Reg#(Bit#(20)) tmpCnt <- mkReg(0);
+	rule forwardTemp;
+		$display("[tick%d] writeB %d", cycleCnt, tmpCnt);
+		tmpCnt <= tmpCnt+1;
+		let a <- toGet(tmpFifo).get;
+		bram_ctrl.writeB( tpl_1(a), tpl_2(a), tpl_3(a) );
 	endrule
 
 	rule ftlRdDone; // Upload done
@@ -566,7 +581,7 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
 	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
 
-	rule initUpload;
+	rule initDownload;
 		downloadReq.deq;
 		mapBramReq.enq(True);
 		ftlWriteReq2Resp.enq(True);
@@ -578,14 +593,14 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 							burstLen: 128
 						};
 
-		let weS = getWEServer(we, 8);
+		let weS = getWEServer(we, 0);
 		weS.request.put(dmaCmd);
 
 		$display("[AFTLBRAMTest.bsv] init dma write cmd issued");
 	endrule
 
 	rule reqMapData if (mapBramReq.notEmpty);
-		//$display("[AFTLBRAMTest.bsv] map read req for download issued: %d", mapDownloadReqCnt);
+		$display("[AFTLBRAMTest.bsv] %dth req", mapDownloadReqCnt);
 		bram_ctrl.readReqB( truncate( mapDownloadReqCnt ) );
 
 		if (mapDownloadReqCnt == fromInteger(mapDownloadReqs - 1)) begin
@@ -599,7 +614,6 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 	FIFO#(Bit#(512)) dmaWrDataBuf <- mkFIFO;
 
 	rule pipeFTLWrData1;
-		//$display("[AFTLBRAMTest.bsv] map read data for download");
 		let d <- bram_ctrl.readB;
 		dmaWrDataBuf.enq(d);
 	endrule
@@ -611,7 +625,7 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 
 		Bit#(DataBusWidth) data = truncate( buffered_data >> { ftlWrPhase, 6'b0 } );
 
-		let weS = getWEServer(we, 8);
+		let weS = getWEServer(we, 0);
 		weS.data.enq(data);
 
 		if (ftlWrPhase == 7) begin
@@ -623,7 +637,7 @@ module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 
 
 	rule ftlWrDone;
-		let weS = getWEServer(we, 8);
+		let weS = getWEServer(we, 0);
 		let dummy <- weS.done.get;
 		ftlWriteReq2Resp.deq;
 

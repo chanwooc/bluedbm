@@ -326,8 +326,8 @@ int main(int argc, const char **argv)
 	testPassed=true;
 	fprintf(stderr, "Initializing DMA...\n");
 
-	device = new FlashRequestProxy(FlashRequestS2H);
-	FlashIndication deviceIndication(FlashIndicationH2S);
+	device = new FlashRequestProxy(IfcNames_FlashRequestS2H);
+	FlashIndication deviceIndication(IfcNames_FlashIndicationH2S);
     DmaManager *dma = platformInit();
 
 	fprintf(stderr, "Main::allocating memory...\n");
@@ -410,6 +410,14 @@ int main(int argc, const char **argv)
 		}
 	}
 
+	printf( "MAP DOWNLOAD!\n" ); fflush(stdout);
+//	device->downloadMap();
+
+	int tmp,tmp2;
+	printf( "put any int to start test\n" );
+	do { 
+		tmp2 =  scanf( "%d", &tmp);
+	} while (!(tmp2 > 0));
 
 	//// map test ///
 
@@ -423,7 +431,6 @@ int main(int argc, const char **argv)
 			blkmap[i][j] = 0x8000;
 #endif
 
-	printf( "MAP UPLOAD!\n" ); fflush(stdout);
 	//uint16_t (*blkmgr)[NUM_CHIPS][NUM_BLOCKS];  // 8*8*4096
 	for (i = 0; i<8; i++)
 		for (j=0; j<8; j++)
@@ -446,10 +453,10 @@ int main(int argc, const char **argv)
 	blkmgr[0][0][24] = 0x80AF;
 #endif
 
+	printf( "MAP UPLOAD!\n" ); fflush(stdout);
 	device->uploadMap();
 
 
-	int tmp,tmp2;
 	printf( "put any int to start test\n" );
 	do { 
 		tmp2 =  scanf( "%d", &tmp);
