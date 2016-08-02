@@ -174,7 +174,7 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	Reg#(Bit#(32)) dmaWriteSgid <- mkReg(0);
 
 	FIFO#(Tuple2#(Bit#(WordSz), TagT)) dataFlash2DmaQ <- mkFIFO();
-	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBuf <- replicateM(mkSizedBRAMFIFO(dmaBurstWords*2));
+	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBuf <- replicateM(mkSizedFIFO(dmaBurstWords*2)); // mkSizedBRAMFIFO
 	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBufOut <- replicateM(mkFIFO());
 
 	Vector#(NUM_ENG_PORTS, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));

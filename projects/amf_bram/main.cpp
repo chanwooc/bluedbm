@@ -411,7 +411,7 @@ int main(int argc, const char **argv)
 	}
 
 	printf( "MAP DOWNLOAD!\n" ); fflush(stdout);
-//	device->downloadMap();
+	device->downloadMap();
 
 	int tmp,tmp2;
 	printf( "put any int to start test\n" );

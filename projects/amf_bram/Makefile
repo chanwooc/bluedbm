@@ -11,7 +11,7 @@ AUTOTOP = --interface pins:Main.pins
 # specific for ZYNQ - Four Masters
 NUMBER_OF_MASTERS=4
 PLATFORM_NUMBER_OF_MASTERS=4
-NUMBER_OF_ENGINES=4
+NUMBER_OF_ENGINES=9
 
 BSVFILES = Main.bsv  \
 	../aftl_bram/Dummy.bsv \
