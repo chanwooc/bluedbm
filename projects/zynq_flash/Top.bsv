@@ -63,7 +63,7 @@ import IfcNames::*;
 import ConnectalConfig::*;
 
 //(* synthesize *)
-module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop) ;
+module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop#(`PinType)) ;
 //module mkConnectalTop (ConnectalTop) ;
 
 	Clock curClk <- exposeCurrentClock;
