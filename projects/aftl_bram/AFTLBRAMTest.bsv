@@ -66,7 +66,8 @@ module mkAFTLBRAMTest#(HostInterface host, AFTLBRAMTestIndication indication)(AF
 	///////////////////////////
 	/// BRAM instantiation
 	///////////////////////////
-	BRAM_Wrapper1 bram_ctrl <- mkBRAM_Wrapper1;
+	//BRAM_Wrapper1 bram_ctrl <- mkBRAM_Wrapper1;
+	BRAM_Wrapper1 bram_ctrl <- mkBRAM_Wrapper_4Banks;
 
 	Reg#(Bit#(32)) counter <- mkReg(0);
 

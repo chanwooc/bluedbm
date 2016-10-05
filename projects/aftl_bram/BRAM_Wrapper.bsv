@@ -2,6 +2,7 @@
 
 import FIFO::*;
 import BRAM::*;
+import Vector::*;
 import Connectable::*;
 import DefaultValue::*;
 
@@ -75,6 +76,81 @@ module mkBRAM_Wrapper1(BRAM_Wrapper1);
 
 	method Action writeB(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen) if (lockFIFO.first==UPLOAD);
 		bram.portB.request.put(makeRequest(byteen, addr, data));
+	endmethod
+
+	method ActionValue#(Bit#(512)) readB if (lockFIFO.first==DOWNLOAD);
+		let d <- toGet(resp2).get;
+		return d;
+	endmethod
+endmodule
+
+module mkBRAM_Wrapper_4Banks(BRAM_Wrapper1);
+	BRAM_Configure cfg = defaultValue;
+	Vector#(4, BRAM2PortBE#(Bit#(12), Bit#(512), 64)) bram <- replicateM(mkBRAM2ServerBE(cfg));
+
+	FIFO#(Bit#(512)) resp   <- mkFIFO;//<- mkSizedFIFO(4); // TODO: mkSizedFIFO(16)
+	FIFO#(Bit#(512)) resp2  <- mkFIFO;//<- mkSizedFIFO(4);
+
+	FIFO#(Bit#(2)) respMuxA <- mkFIFO;
+	FIFO#(Bit#(2)) respMuxB <- mkFIFO;
+
+	function BRAMRequestBE#(Bit#(12), Bit#(512), 64) makeRequest(Bit#(64) write, Bit#(12) addr, Bit#(512) data);
+		return BRAMRequestBE{
+			writeen: write,
+			responseOnWrite: False,
+			address: addr,
+			datain: data
+		};
+	endfunction
+
+	// mkConnection( bram.portA.response, toPut(resp) );
+	// mkConnection( bram.portB.response, toPut(resp2) );
+
+	rule forward_resp1;
+		let d <- bram[respMuxA.first].portA.response.get;
+		resp.enq(d);
+		respMuxA.deq;
+	endrule
+
+	rule forward_resp2;
+		let d <- bram[respMuxB.first].portB.response.get;
+		resp2.enq(d);
+		respMuxB.deq;
+	endrule
+
+	// for map upload/download
+	FIFO#(MapLockMode) lockFIFO <- mkFIFO;
+
+	method Action readReq(Bit#(14) addr);
+		bram[addr[1:0]].portA.request.put(makeRequest(0, addr[13:2], ?));
+		respMuxA.enq(addr[1:0]);
+	endmethod
+
+	method Action write(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen);
+		bram[addr[1:0]].portA.request.put(makeRequest(byteen, addr[13:2], data));
+	endmethod
+
+	method ActionValue#(Bit#(512)) read;
+		let d <- toGet(resp).get;
+		return d;
+	endmethod
+
+
+	method Action lockPortB(MapLockMode a);
+		lockFIFO.enq(a);
+	endmethod
+
+	method Action unlockPortB;
+		lockFIFO.clear;
+	endmethod
+
+	method Action readReqB(Bit#(14) addr) if (lockFIFO.first==DOWNLOAD);
+		bram[addr[1:0]].portB.request.put(makeRequest(0, addr[13:2], ?));
+		respMuxB.enq(addr[1:0]);
+	endmethod
+
+	method Action writeB(Bit#(14) addr, Bit#(512) data, Bit#(64) byteen) if (lockFIFO.first==UPLOAD);
+		bram[addr[1:0]].portB.request.put(makeRequest(byteen, addr[13:2], data));
 	endmethod
 
 	method ActionValue#(Bit#(512)) readB if (lockFIFO.first==DOWNLOAD);

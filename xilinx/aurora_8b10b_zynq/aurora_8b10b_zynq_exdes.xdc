@@ -51,7 +51,7 @@
 ################################################################################
 ## XDC generated for xc7z045-ffg900-2 device
 # 275.0MHz GT Reference clock constraint
-create_clock -name GT_REFCLK1 -period 3.636	 [get_pins */fmc1_gtx_clk_i/O]
+create_clock -name GT_REFCLK1 -period 3.636	 [get_pins -hierarchical -filter { NAME =~ "*/fmc1_gtx_clk_i/O" }]
 ####################### GT reference clock LOC #######################
 set_property LOC AA7 [get_ports aurora_clk_fmc1_gtx_clk_n_v]
 set_property LOC AA8 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
@@ -62,7 +62,7 @@ create_clock -name auroraI_user_clk_i -period 9.091	 [get_pins -hierarchical -re
 # 20.0 ns period Board Clock Constraint (drp,init)
 # create_clock -name auroraI_init_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*/auroraIntraClockDiv4_slowbuf/O}]
 # create_clock -name auroraI_drp_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*/auroraIntraClockDiv4_slowbuf/O}] -add
-create_clock -name auroraI_init_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*auroraIntraClockDiv4/Q}]
+create_clock -name auroraI_init_clk_i -period 20.0 [get_pins -hierarchical -filter { NAME =~ "*auroraIntraClockDiv4/Q*"}]
 
 ###### CDC in RESET_LOGIC from INIT_CLK to USER_CLK ##############
 set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks auroraI_user_clk_i] -datapath_only 9.091	 
