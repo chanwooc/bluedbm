@@ -17,7 +17,7 @@ BSVFILES = IfcNames.bsv Main.bsv Top.bsv \
 	../../controller/src/model_zynq/FlashCtrlModel.bsv \
 	../../controller/src/hw_zynq/FlashCtrlZynq.bsv
 
-CPPFILES=main_eraseall.cpp
+CPPFILES=main.cpp
 
 CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)
@@ -38,11 +38,12 @@ CONNECTALFLAGS += \
 	--implconstraint ../../xilinx/aurora_8b10b_zynq/aurora_8b10b_zynq_exdes.xdc \
 	--implconstraint $(NOHOST_XDC) 
 
-AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq_stub.v
-prebuild:: $(AURORA_INTRA)
+$(IPDIR)/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci: ../../core-scripts/synth-aurora-intra-zynq.tcl
+	cd $(BOARD); vivado -mode batch -source ../../../core-scripts/synth-aurora-intra-zynq.tcl
 
-$(AURORA_INTRA): ../../core-scripts/synth-aurora-intra-zynq.tcl
-	(cd $(BOARD); vivado -mode batch -source ../../../core-scripts/synth-aurora-intra-zynq.tcl)
+ip.%:
+	make gen.$(*)
+	BOARD=$(*) make IPDIR=$(IPDIR) $(IPDIR)/$(*)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci
 endif
 
 include $(CONNECTALDIR)/Makefile.connectal

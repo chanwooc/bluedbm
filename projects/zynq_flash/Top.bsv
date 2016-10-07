@@ -56,11 +56,13 @@ import Clocks :: *;
 
 
 // defined by user
+`include "ConnectalProjectConfig.bsv"
 import Main::*;
 import AuroraCommon::*;
 import TopPins::*;
 import IfcNames::*;
 import ConnectalConfig::*;
+import `PinTypeInclude::*;
 
 //(* synthesize *)
 module mkConnectalTop#(Clock clk200, Reset rst200) (ConnectalTop#(`PinType)) ;
