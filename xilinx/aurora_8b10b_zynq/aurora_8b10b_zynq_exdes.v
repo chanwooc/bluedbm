@@ -90,7 +90,7 @@ module aurora_8b10b_zynq_exdes #
 	//Some Pins Not Needed - Chanwoo
 //    INIT_CLK_P,
 //    INIT_CLK_N,
-//    DRP_CLK_IN,
+    DRP_CLK_IN,
     GT_RESET_N,  // IN->N
 
 //    GTXQ1_P,
@@ -126,7 +126,7 @@ module aurora_8b10b_zynq_exdes #
 input              RESET_N; // RESET -> RESET_N (Chanwoo)
 //input              INIT_CLK_P;
 //input              INIT_CLK_N;
-//input              DRP_CLK_IN;
+input              DRP_CLK_IN;
 input              GT_RESET_N; // IN -> N (Chanwoo)
 output             HARD_ERR;
 output             SOFT_ERR;
@@ -148,8 +148,8 @@ output             CHANNEL_UP;
 
 	wire RESET;
 	assign RESET = ~RESET_N;
-	wire DRP_CLK_IN;
-	assign DRP_CLK_IN = INIT_CLK_IN;
+//	wire DRP_CLK_IN;
+//	assign DRP_CLK_IN = INIT_CLK_IN;
 	wire GT_RESET_IN;
 	assign GT_RESET_IN = ~GT_RESET_N;
 	assign USER_CLK = user_clk_i;
@@ -282,7 +282,7 @@ wire               tx_tready_i;
     // RX AXI PDU I/F wires
 wire    [0:127]    rx_data_i;
 wire               rx_tvalid_i;
-//   wire  drpclk_i;
+wire  drpclk_i;
    //SLACK Registers
    reg    [0:3]      lane_up_r;
    reg    [0:3]      lane_up_r2;
@@ -291,9 +291,9 @@ wire               rx_tvalid_i;
  
 
 
-//  BUFG drpclk_bufg
-//   (.O   (drpclk_i),
-//    .I   (DRP_CLK_IN));
+  BUFG drpclk_bufg
+   (.O   (drpclk_i),
+    .I   (DRP_CLK_IN));
 
   //SLACK registers
   always @ (posedge user_clk_i)
@@ -387,7 +387,7 @@ assign  dwe_in_lane3_i    =  1'b0;
 //        .init_clk_p(INIT_CLK_P),
 //        .init_clk_n(INIT_CLK_N),
 		.init_clk_in(INIT_CLK_IN),
-		.drpclk_in  (DRP_CLK_IN),
+		.drpclk_in  (drpclk_i),
 //        .init_clk_out (init_clk_i),
 .drpaddr_in  (daddr_in_i),
 .drpen_in    (den_in_i),

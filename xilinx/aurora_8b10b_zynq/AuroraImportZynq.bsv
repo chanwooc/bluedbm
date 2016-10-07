@@ -180,7 +180,8 @@ module mkAuroraImport_8b10b_zynq#(Clock gtx_clk_in, Clock init_clk, Reset init_r
 	default_clock no_clock;
 	default_reset no_reset;
 
-	input_clock (INIT_CLK_IN) = init_clk;
+	input_clock init_clk_in (INIT_CLK_IN) = init_clk;
+	input_clock drp_clk_in  (DRP_CLK_IN)  = init_clk; 
 	input_reset (RESET_N) = init_rst_n;
 	input_reset (GT_RESET_N) = gt_rst_n;
 

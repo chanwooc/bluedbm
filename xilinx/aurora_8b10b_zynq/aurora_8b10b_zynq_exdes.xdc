@@ -57,20 +57,15 @@ set_property LOC AA7 [get_ports aurora_clk_fmc1_gtx_clk_n_v]
 set_property LOC AA8 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
 
 # 110MHz user_clk -> 4.4Gbps*8/10*4 = 14.08Gbps = 128bit * 110M
-create_clock -name auroraI_user_clk_i -period 9.091	 [get_pins -hierarchical -regexp {.*/aurora_module_i/clock_module_i/user_clk_buf_i/O}]
+create_clock -name auroraI_user_clk_i -period 9.090	 [get_pins -hierarchical -regexp {.*/aurora_module_i/clock_module_i/user_clk_buf_i/O}]
 
-# 20.0 ns period Board Clock Constraint (drp,init)
-# create_clock -name auroraI_init_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*/auroraIntraClockDiv4_slowbuf/O}]
-# create_clock -name auroraI_drp_clk_i -period 20.0 [get_pins -hierarchical -regexp {.*/auroraIntraClockDiv4_slowbuf/O}] -add
-create_clock -name auroraI_init_clk_i -period 20.0 [get_pins -hierarchical -filter { NAME =~ "*auroraIntraClockDiv4/Q*"}]
+# 20.0 ns period Board Clock Constraint (init, drp)
+create_clock -name auroraI_init_clk_i -period 20.0 [get_nets -hierarchical -filter { NAME =~ "*auroraIntraClockDiv4_CLK_slowClock" }]
+#create_clock -name auroraI_drp_clk_i -period 20.0 [get_nets -hierarchical -filter { NAME =~ "*auroraIntraClockDiv4_CLK_slowClock" }]
 
 ###### CDC in RESET_LOGIC from INIT_CLK to USER_CLK ##############
-set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks auroraI_user_clk_i] -datapath_only 9.091	 
-
-#CDC from auroraI_user_clk_i to/from  (200mhz system clk)
-#Warning: The following constraints must be sourced AFTER zc707.xdc!
-set_max_delay -from [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -to [get_clocks auroraI_user_clk_i] -datapath_only [get_property CLKIN1_PERIOD [get_cells ps7_clockGen_pll]]
-set_max_delay -from [get_clocks auroraI_user_clk_i] -to [get_clocks -of_objects [get_pins ps7_fclk_0_c/O]] -datapath_only [get_property CLKIN1_PERIOD [get_cells ps7_clockGen_pll]]
+set_false_path -through [get_pins -hier *cdc_to*]
+#set_max_delay -from [get_clocks auroraI_init_clk_i] -to [get_clocks auroraI_user_clk_i] -datapath_only 9.091
 
 
 ############################### GT LOC ###################################
