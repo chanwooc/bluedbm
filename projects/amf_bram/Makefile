@@ -26,7 +26,6 @@ CPPFILES=main.cpp
 CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)
 CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS
-CONNECTALFLAGS += --mainclockperiod=5 --derivedclockperiod=5
 
 ifeq ($(BOARD), bluesim)
 CONNECTALFLAGS += -D BSIM

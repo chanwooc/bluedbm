@@ -108,9 +108,9 @@ interface MainIfc;
 	interface Top_Pins pins;
 endinterface
 
-module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
-	Clock curClk <- exposeCurrentClock;
-	Reset curRst <- exposeCurrentReset;
+module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indication)(MainIfc);
+	Clock clk200 <- exposeCurrentClock;
+	Reset rst200 <- exposeCurrentReset;
 
 	Reg#(Bool) started <- mkReg(False);
 	Reg#(Bit#(64)) cycleCnt <- mkReg(0);
