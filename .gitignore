@@ -9,11 +9,14 @@ parser.out
 parsetab.py
 vivado.jou
 vivado.log
+webtalk.jou
+vivado*.str
 build.log
 
 flashemul/vc707/
 tools
 bsimall
+.Xil/
 
 vc707*
 bluesim*
