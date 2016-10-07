@@ -22,8 +22,10 @@ endinterface
 module mkClockDiv4#(Clock fastClock) (ClockDiv4Ifc);
 	MakeResetIfc fastReset <- mkReset(8, True, fastClock);
 	ClockDividerIfc clockdiv4 <- mkClockDivider(4, clocked_by fastClock, reset_by fastReset.new_rst);
+	Clock bufg <- mkClockBUFG(clocked_by clockdiv4.slowClock);
 
-	interface slowClock = clockdiv4.slowClock;
+	interface slowClock = bufg;
+	//interface slowClock = clockdiv4.slowClock;
 endmodule
 
 `ifndef BSIM
