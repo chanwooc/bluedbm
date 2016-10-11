@@ -48,12 +48,6 @@ $(IPDIR)/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci: ../../core-scripts/sy
 ip.%:
 	make gen.$(*)
 	BOARD=$(*) make IPDIR=$(IPDIR) $(IPDIR)/$(*)/aurora_8b10b_zynq/aurora_8b10b_zynq.xci
-
-#AURORA_INTRA = $(CONNECTALDIR)/out/$(BOARD)/aurora_8b10b_zynq/aurora_8b10b_zynq_stub.v
-#prebuild:: $(AURORA_INTRA)
-#
-#$(AURORA_INTRA): ../../core-scripts/synth-aurora-intra-zynq.tcl
-#	(cd $(BOARD); vivado -mode batch -source ../../../core-scripts/synth-aurora-intra-zynq.tcl)
 endif
 
 include $(CONNECTALDIR)/Makefile.connectal
