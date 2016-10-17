@@ -361,8 +361,8 @@ int main(int argc, const char **argv)
 	testPassed=true;
 	fprintf(stderr, "Initializing DMA...\n");
 
-	device = new FlashRequestProxy(FlashRequestS2H);
-	FlashIndication deviceIndication(FlashIndicationH2S);
+	device = new FlashRequestProxy(IfcNames_FlashRequestS2H);
+	FlashIndication deviceIndication(IfcNames_FlashIndicationH2S);
     DmaManager *dma = platformInit();
 
 	fprintf(stderr, "Main::allocating memory...\n");

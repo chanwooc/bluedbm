@@ -5,7 +5,7 @@ MEM_READ_INTERFACES = lMain.dmaReadClient
 MEM_WRITE_INTERFACES = lMain.dmaWriteClient
 
 PIN_TYPE=Top_Pins
-PIN_TYPE_INCLUDE=TopPins
+PIN_TYPE_INCLUDE=Top_Pins
 AUTOTOP = --interface pins:Main.pins
 
 # specific for ZYNQ - Four Masters
@@ -21,11 +21,12 @@ BSVFILES = Main.bsv  \
 	../../controller/src/model_zynq/FlashCtrlModel.bsv \
 	../../controller/src/hw_zynq/FlashCtrlZynq.bsv
 
-CPPFILES=main.cpp
+CPPFILES=main_example.cpp
 
 CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)
 CONNECTALFLAGS += -D IMPORT_HOST_CLOCKS
+CONNECTALFLAGS += --mainclockperiod=6 --derivedclockperiod=5
 
 ifeq ($(BOARD), bluesim)
 CONNECTALFLAGS += -D BSIM

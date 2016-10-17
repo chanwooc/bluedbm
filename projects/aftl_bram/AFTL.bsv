@@ -150,7 +150,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 
 	Reg#(Maybe#(Tuple2#(Bit#(14), Bit#(14)))) blkToAlloc <- mkReg(tagged Invalid);
 
-	rule readReqMapTable (phase == P0) ;
+	rule readReqMapTable ( phase == P0 );
 		FTLCmd ftlCmd <- toGet(reqs).get;
 
 		let logAddr = getLogAddr(ftlCmd.lpa);
@@ -167,7 +167,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 
 	Reg#(MapEntry) mapEntry <- mkReg(?);
 
-	rule readMapTable ( phase == P1 ) ;
+	rule readMapTable ( phase == P1 );
 		let map <- bram_ctrl.read;
 		let logAddr = getLogAddr(procQ.first.lpa);
 
@@ -360,7 +360,7 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 		Bit#(14) erase   = entry.erase;
 
 		// CLEAN_BLK -> DIRTY_BLK
-		// But for now, we assume CLEAN_BLKs are not BAD (so just make it FREE)
+		// But for now, we assume CLEAN_BLKs are not DIRTY (so just make it FREE)
 		BlkEntry newEntry = BlkEntry{status: FREE_BLK, erase: erase+1};
 		bram_ctrl.write( zeroExtend({ 1'b1, channel, chip, block[11:5] }),
 						 zeroExtend(pack(newEntry)) << idx ,

@@ -55,6 +55,8 @@ import ControllerTypes::*;
 import FlashCtrlZynq::*;
 import FlashCtrlModel::*;
 
+import Top_Pins::*;
+
 //import MainTypes::*;
 typedef 8 NUM_ENG_PORTS;
 
@@ -93,11 +95,12 @@ interface MainIfc;
 	interface FlashRequest request;
 	interface Vector#(NumWriteClients, MemWriteClient#(DataBusWidth)) dmaWriteClient;
 	interface Vector#(NumReadClients, MemReadClient#(DataBusWidth)) dmaReadClient;
-	interface Aurora_Pins#(4) aurora_fmc1;
-	interface Aurora_Clock_Pins aurora_clk_fmc1;
+	interface Top_Pins pins;
+//	interface Aurora_Pins#(4) aurora_fmc1;
+//	interface Aurora_Clock_Pins aurora_clk_fmc1;
 endinterface
 
-module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
+module mkMain#(Clock clk200, Reset rst200, FlashIndication indication)(MainIfc);
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
 
@@ -564,6 +567,8 @@ module mkMain#(FlashIndication indication, Clock clk200, Reset rst200)(MainIfc);
 	interface dmaWriteClient = dmaWriteClientVec;
 	interface dmaReadClient = dmaReadClientVec;
 
-	interface aurora_fmc1 = flashCtrl.aurora;
-	interface aurora_clk_fmc1 = gtx_clk_fmc1.aurora_clk;
+	interface Top_Pins pins;
+		interface aurora_fmc1 = flashCtrl.aurora;
+		interface aurora_clk_fmc1 = gtx_clk_fmc1.aurora_clk;
+	endinterface
 endmodule

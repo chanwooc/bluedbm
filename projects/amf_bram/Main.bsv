@@ -57,7 +57,7 @@ import FlashCtrlModel::*;
 
 import AFTL::*;
 import BRAM_Wrapper::*;
-import TopPins::*;
+import Top_Pins::*;
 
 //import MainTypes::*;
 typedef 8 NUM_FLASH_DMA_PORTS;
@@ -109,8 +109,8 @@ interface MainIfc;
 endinterface
 
 module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indication)(MainIfc);
-	Clock clk200 <- exposeCurrentClock;
-	Reset rst200 <- exposeCurrentReset;
+	Clock clk200 = derivedClock;
+	Reset rst200 = derivedReset;
 
 	Reg#(Bool) started <- mkReg(False);
 	Reg#(Bit#(64)) cycleCnt <- mkReg(0);
@@ -485,23 +485,24 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 
 	Reg#(Bit#(32)) dmaMapSgid <- mkReg(0);
 	FIFO#(MapLockMode) mapReq <- mkFIFO;
-	FIFO#(Bool) downloadReq <- mkSizedFIFO(4);
-	FIFO#(Bool) uploadReq <- mkSizedFIFO(4);
+//	FIFO#(Bool) downloadReq <- mkSizedFIFO(4);
+//	FIFO#(Bool) uploadReq <- mkSizedFIFO(4);
 
-	rule issueMapReq;
+	rule issueMapReq (!bram_ctrl.isLocked);
 		let d = mapReq.first;
 		mapReq.deq;
 		bram_ctrl.lockPortB(d);
 
-		if (d == UPLOAD) uploadReq.enq(True);
-		else downloadReq.enq(True);
+//		if (d == UPLOAD) uploadReq.enq(True);
+//		else downloadReq.enq(True);
 	endrule
 
 	// DMA Read (Host->FPGA, Upload)
-	FIFOF#(Bool) ftlReadReq2Resp <- mkSizedFIFOF(10);
-	FIFO#(Bool)  ftlReadResp <- mkFIFO;
+	FIFOF#(Bool) ftlReadReq2Resp <- mkFIFOF;
+	FIFOF#(Bool) ftlReadResp <- mkFIFOF;
 
-	rule initFTLRead; // from Host to FPGA (Upload)
+	rule initFTLRead (bram_ctrl.lockMode == UPLOAD && !ftlReadReq2Resp.notEmpty && !ftlReadResp.notEmpty);
+	// from Host to FPGA (Upload)
 		let dmaCmd = MemengineCmd {
 							sglId: dmaMapSgid, 
 							base: 0,
@@ -514,7 +515,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 
 		$display("[AFTLBRAMTest.bsv] init dma read cmd issued");
 
-		uploadReq.deq;
+//		uploadReq.deq;
 		ftlReadReq2Resp.enq(True);
 	endrule
 
@@ -528,7 +529,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		cycleCnt <= cycleCnt + 1;
 	endrule
 
-	rule pipeFTLRdData if (ftlReadReq2Resp.notEmpty);
+	rule pipeFTLRdData (bram_ctrl.lockMode == UPLOAD && ftlReadReq2Resp.notEmpty && !ftlReadResp.notEmpty );
 		let reS = getREServer(re, 8);
 		let d <- toGet(reS.data).get; //Each beat is 64 bit = 8 Byte wide
 		$display("[tick%d] dmaGet %d", cycleCnt, ftlReadBeatCnt);
@@ -550,15 +551,16 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 			ftlReadBeatCnt <= ftlReadBeatCnt+1;
 		end
 	endrule
-	rule ftlRdDone; // Upload done
+
+	rule ftlRdDone (bram_ctrl.lockMode == UPLOAD && !ftlReadReq2Resp.notEmpty && ftlReadResp.notEmpty); // Upload done
 		ftlReadResp.deq;
 		indication.uploadDone;
 		bram_ctrl.unlockPortB;
 	endrule
 
 	// DMA Write
-	FIFOF#(Bool) mapBramReq <- mkSizedFIFOF(10);
-	FIFOF#(Bool) ftlWriteReq2Resp <- mkSizedFIFOF(10);
+	FIFOF#(Bool) mapBramReq <- mkFIFOF;//mkSizedFIFOF(10);
+	FIFOF#(Bool) ftlWriteReq2Resp <- mkFIFOF;//mkSizedFIFOF(10);
 
 	// Total 1MB, each word: 512bit=64Byte -> total 14bit address
 	// Total 1MB, Each burst beat 64bit = 8Byte -> total 128*1024 beats
@@ -566,8 +568,8 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
 	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
 
-	rule initDownload;
-		downloadReq.deq;
+	rule initDownload (bram_ctrl.lockMode == DOWNLOAD && !mapBramReq.notEmpty && !ftlWriteReq2Resp.notEmpty);
+//		downloadReq.deq;
 		mapBramReq.enq(True);
 		ftlWriteReq2Resp.enq(True);
 
@@ -584,7 +586,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		$display("[AFTLBRAMTest.bsv] init dma write cmd issued");
 	endrule
 
-	rule reqMapData if (mapBramReq.notEmpty);
+	rule reqMapData (bram_ctrl.lockMode == DOWNLOAD && mapBramReq.notEmpty);
 		$display("[AFTLBRAMTest.bsv] %dth req", mapDownloadReqCnt);
 		bram_ctrl.readReqB( truncate( mapDownloadReqCnt ) );
 
@@ -598,14 +600,14 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 
 	FIFO#(Bit#(512)) dmaWrDataBuf <- mkFIFO;
 
-	rule pipeFTLWrData1;
+	rule pipeFTLWrData1 (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
 		let d <- bram_ctrl.readB;
 		dmaWrDataBuf.enq(d);
 	endrule
 
 	Reg#(Bit#(3)) ftlWrPhase <- mkReg(0);
 
-	rule pipeFTLWrData2;
+	rule pipeFTLWrData2 (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
 		let buffered_data = dmaWrDataBuf.first; // 512bit
 
 		Bit#(DataBusWidth) data = truncate( buffered_data >> { ftlWrPhase, 6'b0 } );
@@ -621,7 +623,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	endrule
 
 
-	rule ftlWrDone;
+	rule ftlWrDone (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
 		let weS = getWEServer(we, 8);
 		let dummy <- weS.done.get;
 		ftlWriteReq2Resp.deq;

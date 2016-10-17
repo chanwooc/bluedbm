@@ -7,12 +7,8 @@
 #include <monkit.h>
 #include <semaphore.h>
 
-//#include <list>
 #include <time.h>
 
-//#include "StdDmaIndication.h"
-//#include "MemServerRequest.h"
-//#include "MMURequest.h"
 #include "dmaManager.h"
 
 #include "FlashIndication.h"
