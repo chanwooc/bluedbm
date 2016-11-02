@@ -1,5 +1,6 @@
 import FShow::*;
 import GetPut::*;
+`include "ConnectalProjectConfig.bsv"
 
 //**********************************************************
 // Type definitions of the flash controller and submodules

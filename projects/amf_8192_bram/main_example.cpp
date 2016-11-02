@@ -18,7 +18,7 @@
 //#define FPAGE_SIZE_VALID (8224)
 #define FPAGE_SIZE (8192)
 #define FPAGE_SIZE_VALID (8192)
-#define NUM_TAGS 128
+#define NUM_TAGS 64//128
 
 // for Table 
 #define NUM_BLOCKS 4096
@@ -47,8 +47,10 @@ pthread_cond_t flashFreeTagCond;
 //8k * 128 (Actually using 8 KB per page)
 size_t dstAlloc_sz = FPAGE_SIZE * NUM_TAGS * sizeof(unsigned char);
 size_t srcAlloc_sz = FPAGE_SIZE * NUM_TAGS * sizeof(unsigned char);
+
 int dstAlloc;
 int srcAlloc;
+
 unsigned int ref_dstAlloc;
 unsigned int ref_srcAlloc;
 
@@ -130,32 +132,31 @@ bool checkReadData(int tag) {
     return pass;
 }
 
-class FlashIndication : public FlashIndicationWrapper
-{
+class FlashIndication: public FlashIndicationWrapper {
 	public:
 		FlashIndication(unsigned int id) : FlashIndicationWrapper(id){}
 
 		virtual void readDone(unsigned int tag, unsigned int status) {
-			bool tempPassed = true;
-			printf("LOG: readdone: tag=%d inflight=%d\n", tag, curReadsInFlight );
+//			bool tempPassed = true;
+			printf("LOG: readdone: tag=%d inflight=%d status=%d\n", tag, curReadsInFlight, status );
 			fflush(stdout);
 
 			//check
-			tempPassed = checkReadData(tag);
+//			tempPassed = checkReadData(tag);
 
 			pthread_mutex_lock(&flashReqMutex);
 			curReadsInFlight --;
 
-			if ( tempPassed == false ) {
-				testPassed = false;
-				printf("LOG: **ERROR: check read data failed @ tag=%d\n",tag);
-			}
-			if ( curReadsInFlight < 0 ) {
-				fprintf(stderr, "LOG: **ERROR: Read requests in flight cannot be negative %d\n", curReadsInFlight );
-				curReadsInFlight = 0;
-			}
+//			if ( tempPassed == false ) {
+//				testPassed = false;
+//				printf("LOG: **ERROR: check read data failed @ tag=%d\n",tag);
+//			}
+//			if ( curReadsInFlight < 0 ) {
+//				fprintf(stderr, "LOG: **ERROR: Read requests in flight cannot be negative %d\n", curReadsInFlight );
+//				curReadsInFlight = 0;
+//			}
 			if ( readTagTable[tag].busy == false ) {
-				fprintf(stderr, "LOG: **ERROR: received unused buffer read done %d\n", tag);
+				fprintf(stderr, "LOG: **ERROR: received unused buffer read done (duplicate) tag=%d\n", tag);
 				testPassed = false;
 			}
 			readTagTable[tag].busy = false;
@@ -205,13 +206,11 @@ class FlashIndication : public FlashIndicationWrapper
 			fprintf(stderr, "LOG: DEBUG DUMP: gearSend = %d, gearRec = %d, aurSend = %d, aurRec = %d, readSend=%d, writeSend=%d\n", debug0, debug1, debug2, debug3, debug4, debug5);
 		}
 
-		virtual void uploadDone()
-		{
+		virtual void uploadDone () {
 			fprintf(stderr, "Map Upload(Host->FPGA) done!\n");
 		}
 
-		virtual void downloadDone()
-		{
+		virtual void downloadDone () {
 			fprintf(stderr, "Map Download(FPGA->Host) done!\n");
 		}
 };
@@ -466,49 +465,55 @@ int main(int argc, const char **argv)
 
 	printf( "MAP Upload to HW!\n" ); fflush(stdout);
 	device->uploadMap();
+	sleep(1);
 
 	timespec start, now;
 	clock_gettime(CLOCK_REALTIME, & start);
 
-	printf( "Test Write!\n" ); fflush(stdout);
-
-	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
-		// test only 1024 segments due to some bad blocks (cannot allocate full 4096 segments)
-		for (int segnum = 0; segnum < 1024; segnum++) {
-			// assuming page_ofs = 0
-			int lpa = (segnum<<14) + logblk;
-			int freeTag = waitIdleWriteBuffer();
-
-			// fill write memory
-			for (unsigned int w=0; w<FPAGE_SIZE_VALID/sizeof(unsigned int); w++) {
-				writeBuffers[freeTag][w] = hashAddrToData(lpa, w);
-			}
-
-			writePage(freeTag, lpa);
-		}
-	}
-
-	while (true) {
-		usleep(100);
-		if ( getNumWritesInFlight() == 0 ) break;
-	}
-
-	// read back Map and Save to table.dump.1
-	device->downloadMap(); // read table from FPGA
-	if(writeFTLtoFile("table.dump.1", ftlPtr) != 0) {
-		fprintf(stderr, "Write Failure\n");
-		return -1;
-	}
+//	printf( "Test Write!\n" ); fflush(stdout);
+//
+//	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
+//		// test only 128 segments due to some bad blocks (cannot allocate full 4096 segments)
+//		for (int segnum = 0; segnum < 2; segnum++) { // 2 segment only for now
+//			// assuming page_ofs = 0
+//			int lpa = (segnum<<14) + logblk;
+//			int freeTag = waitIdleWriteBuffer();
+//
+//			// fill write memory
+//			for (unsigned int w=0; w<FPAGE_SIZE_VALID/sizeof(unsigned int); w++) {
+//				writeBuffers[freeTag][w] = hashAddrToData(lpa, w);
+//			}
+//
+//			writePage(freeTag, lpa);
+//		}
+//	}
+//
+//	while (true) {
+//		usleep(100);
+//		if ( getNumWritesInFlight() == 0 ) break;
+//	}
+//
+//	// read back Map and Save to table.dump.1
+//	device->downloadMap(); // read table from FPGA
+//	if(writeFTLtoFile("table.dump.0", ftlPtr) != 0) {
+//		fprintf(stderr, "Write Failure\n");
+//		return -1;
+//	}
+//	sleep(1);
+//	printf( "Done writing table.dump.0\n" ); fflush(stdout);
 
 	printf( "Test Read!\n" ); fflush(stdout);
 	
-	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
-		// test only 1024 segments due to some bad blocks (cannot allocate full 4096 segments)
-		for (int segnum = 0; segnum < 1024; segnum++) {
-			// assuming page_ofs = 0
-			int lpa = (segnum<<14) + logblk;
-			readPage(waitIdleReadBuffer(), lpa);
-		}
+//	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
+//		// test only 1024 segments due to some bad blocks (cannot allocate full 4096 segments)
+//		for (int segnum = 0; segnum < 1024; segnum++) {
+//			// assuming page_ofs = 0
+//			int lpa = (segnum<<14) + logblk;
+//			readPage(waitIdleReadBuffer(), lpa);
+//		}
+//	}
+	for (int lpa = 0; lpa < 2<<14; lpa++) {
+		readPage(waitIdleReadBuffer(), lpa);
 	}
 
 	while (true) {
@@ -516,20 +521,20 @@ int main(int argc, const char **argv)
 		if ( getNumReadsInFlight() == 0 ) break;
 	}
 
-	printf( "Test Erase!\n" ); fflush(stdout);
-	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
-		// test only 1024 segments due to some bad blocks (cannot allocate full 4096 segments)
-		for (int segnum = 0; segnum < 1024; segnum++) {
-			// assuming page_ofs = 0
-			int lpa = (segnum<<14) + logblk;
-			eraseBlock(waitIdleEraseTag(), lpa);
-		}
-	}
-
-	while (true) {
-		usleep(100);
-		if ( getNumErasesInFlight() == 0 ) break;
-	}
+//	printf( "Test Erase!\n" ); fflush(stdout);
+//	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
+//		// test only 1024 segments due to some bad blocks (cannot allocate full 4096 segments)
+//		for (int segnum = 0; segnum < 1024; segnum++) {
+//			// assuming page_ofs = 0
+//			int lpa = (segnum<<14) + logblk;
+//			eraseBlock(waitIdleEraseTag(), lpa);
+//		}
+//	}
+//
+//	while (true) {
+//		usleep(100);
+//		if ( getNumErasesInFlight() == 0 ) break;
+//	}
 
 	int elapsed = 0;
 	while (true) {

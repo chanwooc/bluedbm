@@ -157,9 +157,9 @@ module mkAFTL#(BRAM_Wrapper1 bram_ctrl)(AFTLIfc);
 
 		procQ.enq(ftlCmd);
 
-		// dram: 64-byte word "with three LSBs = 0"
+		// bram: 64-byte word with {1'b0, segment 12bit, logblk[5] 1bit}
 		// each entry: 2byte -> 32 entries -> indexed by logAddr.block[4:0]
-		// Addr[16] = 0 for Mapping Table
+		// Addr[13] = 0 for Mapping Table
 		bram_ctrl.readReq( zeroExtend({ 1'b0, logAddr.segment, logAddr.block[5] }) );
 
 		phase <= P1;

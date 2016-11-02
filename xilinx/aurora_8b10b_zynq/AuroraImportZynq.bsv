@@ -7,6 +7,7 @@ import DefaultValue :: *;
 import Xilinx :: *;
 import XilinxCells :: *;
 import ConnectalXilinxCells::*;
+`include "ConnectalProjectConfig.bsv"
 
 import AuroraCommon::*;
 

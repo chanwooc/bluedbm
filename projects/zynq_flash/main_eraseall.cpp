@@ -14,13 +14,13 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define BLOCKS_PER_CHIP 4096
+#define BLOCKS_PER_CHIP 100//4096
 #define CHIPS_PER_BUS 8
 #define NUM_BUSES 8
 
 #define FPAGE_SIZE (8192*2)
 #define FPAGE_SIZE_VALID (8224)
-#define NUM_TAGS 128
+#define NUM_TAGS 64 //
 
 typedef enum {
 	UNINIT,
@@ -143,34 +143,38 @@ class FlashIndication : public FlashIndicationWrapper
 
 			if ( verbose ) {
 				//printf( "%s received read page buffer: %d %d\n", log_prefix, rbuf, curReadsInFlight );
-				printf( "LOG: pagedone: tag=%d; inflight=%d\n", tag, curReadsInFlight );
+				printf( "LOG: pagedone: tag=%d inflight=%d \n", tag, curReadsInFlight );
 				fflush(stdout);
 			}
 
 			//check 
-			tempPassed = checkReadData(tag);
+//			tempPassed = checkReadData(tag);
 
 			pthread_mutex_lock(&flashReqMutex);
-			curReadsInFlight --;
-			if ( tempPassed == false ) {
-				testPassed = false;
-				fprintf(stderr, "LOG: checkReadData failed, tag=%d \n", tag); fflush(stdout);
-			}
-			if ( curReadsInFlight < 0 ) {
-				fprintf(stderr, "LOG: **ERROR: Read requests in flight cannot be negative %d\n", curReadsInFlight );
-				curReadsInFlight = 0;
-			}
+//			curReadsInFlight --;
+//			if ( tempPassed == false ) {
+//				testPassed = false;
+//				fprintf(stderr, "LOG: checkReadData failed, tag=%d \n", tag); fflush(stdout);
+//			}
+//			if ( curReadsInFlight < 0 ) {
+//				fprintf(stderr, "LOG: **ERROR: Read requests in flight cannot be negative %d\n", curReadsInFlight );
+//				curReadsInFlight = 0;
+//			}
 			if ( readTagTable[tag].busy == false ) {
-				fprintf(stderr, "LOG: **ERROR: received unused buffer read done %d\n", tag);
-				testPassed = false;
+				fprintf(stderr, "LOG: **ERROR: received unused buffer read done (ACK duplicate?) tag=%d\n", tag);
+				tempPassed = false;
 			}
 			readTagTable[tag].busy = false;
-			//pthread_cond_broadcast(&flashFreeTagCond);
+
+			if (tempPassed) {
+				curReadsInFlight --;
+			}
+
 			pthread_mutex_unlock(&flashReqMutex);
 		}
 
 		virtual void writeDone(unsigned int tag) {
-			printf("LOG: writedone, tag=%d\n", tag); fflush(stdout);
+			printf("LOG: writedone: tag=%d\n", tag); fflush(stdout);
 			//TODO probably should use a diff lock
 			pthread_mutex_lock(&flashReqMutex);
 			curWritesInFlight--;
@@ -422,34 +426,41 @@ int main(int argc, const char **argv)
 	device->debugDumpReq(0);
 	sleep(1);
 
-	timespec start, now;
-	clock_gettime(CLOCK_REALTIME, & start);
-
 	printf( "TEST ERASE STARTED!\n" ); fflush(stdout);
 
-	//test erases
-	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-			for (int bus = 0; bus < NUM_BUSES; bus++){
-				eraseBlock(bus, chip, blk, waitIdleEraseTag());
-			}
-		}
-	}
+//	//test erases
+//	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
+//		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+//			for (int bus = 0; bus < NUM_BUSES; bus++){
+//				eraseBlock(bus, chip, blk, waitIdleEraseTag());
+//			}
+//		}
+//	}
+//
+//	while (true) {
+//		usleep(100);
+//		if ( getNumErasesInFlight() == 0 ) break;
+//	}
+//	printf( "TEST ERASE FINISHED!\n" ); fflush(stdout);
 
-	while (true) {
-		usleep(100);
-		if ( getNumErasesInFlight() == 0 ) break;
-	}
-	printf( "TEST ERASE FINISHED!\n" ); fflush(stdout);
-
-	printf( "READ ERASED PAGES STARTED!\n" ); fflush(stdout);
+	printf( "READ MANY PAGES STARTED!\n" ); fflush(stdout);
 	//read back erased pages
-	for (int bus = 0; bus < NUM_BUSES; bus++){
-		for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-				readPage(bus, chip, blk, 0, waitIdleReadBuffer());
-			}
-		}
+//	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
+//	for (int pofs= 0; pofs < 256; pofs++) {
+//		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+//			for (int bus = 0; bus < NUM_BUSES; bus++){
+//				readPage(bus, chip, blk, pofs, waitIdleReadBuffer());
+//			}
+//		}
+//	}
+//	}
+	for (unsigned int lpa=0; lpa < 1<<14; lpa++) {
+		unsigned int bus, chip, blk, page;
+		bus = lpa & 7;
+		chip = (lpa >> 3) & 7;
+		blk = lpa >> 14;
+		page = (lpa - (blk << 14)) >> 6;
+		readPage(bus, chip, blk, page, waitIdleReadBuffer());
 	}
 	
 	while (true) {
@@ -457,7 +468,7 @@ int main(int argc, const char **argv)
 			if ( getNumReadsInFlight() == 0 ) break;
 	}
 
-	printf( "READ ERASED PAGES FINISHED!\n" ); fflush(stdout);
+	printf( "READ PAGES FINISHED!\n" ); fflush(stdout);
 
 	int elapsed = 0;
 	while (true) {
@@ -473,44 +484,44 @@ int main(int argc, const char **argv)
 	}
 	device->debugDumpReq(0);
 
-	clock_gettime(CLOCK_REALTIME, & now);
+//	clock_gettime(CLOCK_REALTIME, & now);
 
-	uint8_t *tmpPtr = (uint8_t *)calloc(blkmapAlloc_sz*2, 1); // reserving 1 MB
-	blkmap      = (uint16_t(*)[NUM_CHANNELS*NUM_CHIPS]) (tmpPtr);
-	blkmgr      = (uint16_t(*)[NUM_CHIPS][NUM_BLOCKS])  (tmpPtr+blkmapAlloc_sz);
-
-	FILE *fp,*fp2;
-	fp = fopen("badblockmap.txt", "w");
-
-	if (fp != NULL) {
-		for (int bus = 0; bus < NUM_BUSES; bus++){
-			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-				for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-					BadBlockEntry entry = badBlockTable[bus][chip][blk];
-
-					if (entry.eraseIssued == false)
-						fprintf(stderr, "erase not issued @%d %d %d 0\n", bus, chip, blk);
-					else
-					{
-						fprintf(fp, "%d %d %d %d %d\n", bus, chip, blk, entry.badFromErase, entry.badFromRead);
-						blkmgr[bus][chip][blk] = (entry.badFromErase)?(3<<14):0;
-					}
-				}
-			}
-		}
-	} else {
-		fprintf(stderr, "couldn't open badblockmap.txt\n");
-	}
-
-	fp2 = fopen("table.dump.0", "w");
-
-	if (fp2 != NULL) {
-		fwrite(tmpPtr, blkmapAlloc_sz*2, 1, fp2);
-	}
-
-	fclose(fp);
-	fclose(fp2);
-	free(tmpPtr);
+//	uint8_t *tmpPtr = (uint8_t *)calloc(blkmapAlloc_sz*2, 1); // reserving 1 MB
+//	blkmap      = (uint16_t(*)[NUM_CHANNELS*NUM_CHIPS]) (tmpPtr);
+//	blkmgr      = (uint16_t(*)[NUM_CHIPS][NUM_BLOCKS])  (tmpPtr+blkmapAlloc_sz);
+//
+//	FILE *fp,*fp2;
+//	fp = fopen("badblockmap.txt", "w");
+//
+//	if (fp != NULL) {
+//		for (int bus = 0; bus < NUM_BUSES; bus++){
+//			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+//				for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
+//					BadBlockEntry entry = badBlockTable[bus][chip][blk];
+//
+//					if (entry.eraseIssued == false)
+//						fprintf(stderr, "erase not issued @%d %d %d 0\n", bus, chip, blk);
+//					else
+//					{
+//						fprintf(fp, "%d %d %d %d %d\n", bus, chip, blk, entry.badFromErase, entry.badFromRead);
+//						blkmgr[bus][chip][blk] = (entry.badFromErase)?(3<<14):0;
+//					}
+//				}
+//			}
+//		}
+//	} else {
+//		fprintf(stderr, "couldn't open badblockmap.txt\n");
+//	}
+//
+//	fp2 = fopen("table.dump.0", "w");
+//
+//	if (fp2 != NULL) {
+//		fwrite(tmpPtr, blkmapAlloc_sz*2, 1, fp2);
+//	}
+//
+//	fclose(fp);
+//	fclose(fp2);
+//	free(tmpPtr);
 
 	sleep(2);
 }
