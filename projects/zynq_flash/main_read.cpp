@@ -18,8 +18,8 @@
 #include "FlashIndication.h"
 #include "FlashRequest.h"
 
-#define PAGES_PER_BLOCK 128
-#define BLOCKS_PER_CHIP 512
+#define PAGES_PER_BLOCK 128 // 256
+#define BLOCKS_PER_CHIP 256 // 4096
 #define CHIPS_PER_BUS 8 // 8
 #define NUM_BUSES 8 // 8
 
@@ -358,18 +358,12 @@ void readPage(int bus, int chip, int block, int page, int tag) {
 
 int main(int argc, const char **argv)
 {
-
-    //MemServerRequestProxy *hostMemServerRequest = new MemServerRequestProxy(HostMemServerRequestS2H);
-	//MMURequestProxy *dmap = new MMURequestProxy(HostMMURequestS2H);
-	//DmaManager *dma = new DmaManager(dmap);
-	//MemServerIndication hostMemServerIndication(hostMemServerRequest, HostMemServerIndicationH2S);
-	//MMUIndication hostMMUIndication(dma, HostMMUIndicationH2S);
 	testPassed=true;
 	fprintf(stderr, "Initializing DMA...\n");
 
-	device = new FlashRequestProxy(FlashRequestS2H);
-	FlashIndication deviceIndication(FlashIndicationH2S);
-    DmaManager *dma = platformInit();
+	device = new FlashRequestProxy(IfcNames_FlashRequestS2H);
+	FlashIndication deviceIndication(IfcNames_FlashIndicationH2S);
+	DmaManager *dma = platformInit();
 
 	fprintf(stderr, "Main::allocating memory...\n");
 	
@@ -386,24 +380,22 @@ int main(int argc, const char **argv)
 
 	printf( "Done initializing hw interfaces\n" ); fflush(stdout);
 
-	//portalExec_start();
-	printf( "Done portalExec_start\n" ); fflush(stdout);
-
-	//portalCacheFlush(dstAlloc, dstBuffer, dstAlloc_sz, 1);
-	//portalCacheFlush(srcAlloc, srcBuffer, srcAlloc_sz, 1);
+	portalCacheFlush(dstAlloc, dstBuffer, dstAlloc_sz, 1);
+	portalCacheFlush(srcAlloc, srcBuffer, srcAlloc_sz, 1);
 	ref_dstAlloc = dma->reference(dstAlloc);
 	ref_srcAlloc = dma->reference(srcAlloc);
+
+	device->setDmaWriteRef(ref_dstAlloc);
+	device->setDmaReadRef(ref_srcAlloc);
 
 	for (int t = 0; t < NUM_TAGS; t++) {
 		readTagTable[t].busy = false;
 		writeTagTable[t].busy = false;
 		int byteOffset = t * FPAGE_SIZE;
-		device->addDmaWriteRefs(ref_dstAlloc, byteOffset, t);
-		device->addDmaReadRefs(ref_srcAlloc, byteOffset, t);
 		readBuffers[t] = dstBuffer + byteOffset/sizeof(unsigned int);
 		writeBuffers[t] = srcBuffer + byteOffset/sizeof(unsigned int);
 	}
-	
+
 	for (int blk=0; blk < BLOCKS_PER_CHIP; blk++) {
 		for (int c=0; c < CHIPS_PER_BUS; c++) {
 			for (int bus=0; bus< NUM_BUSES; bus++) {
