@@ -72,7 +72,7 @@ uint16_t (*blkmap)[NUM_CHANNELS*NUM_CHIPS]; // 4096*64
 uint16_t (*blkmgr)[NUM_CHIPS][NUM_BLOCKS];  // 8*8*4096
 
 bool testPassed = false;
-bool verbose = true;
+bool verbose = false;
 int curReadsInFlight = 0;
 int curWritesInFlight = 0;
 int curErasesInFlight = 0;
@@ -138,8 +138,12 @@ class FlashIndication: public FlashIndicationWrapper {
 
 		virtual void readDone(unsigned int tag, unsigned int status) {
 //			bool tempPassed = true;
-			printf("LOG: readdone: tag=%d inflight=%d status=%d\n", tag, curReadsInFlight, status );
-			fflush(stdout);
+
+			if ( verbose ) {
+				//printf( "%s received read page buffer: %d %d\n", log_prefix, rbuf, curReadsInFlight );
+				printf( "LOG: pagedone: tag=%d; inflight=%d\n", tag, curReadsInFlight );
+				fflush(stdout);
+			}
 
 			//check
 //			tempPassed = checkReadData(tag);
@@ -165,18 +169,20 @@ class FlashIndication: public FlashIndicationWrapper {
 		}
 
 		virtual void writeDone(unsigned int tag, unsigned int status) {
-			printf("LOG: writedone: tag=%d inflight=%d\n", tag, curWritesInFlight );
-			fflush(stdout);
+			if (verbose) {
+				printf("LOG: writedone, tag=%d\n", tag); fflush(stdout);
+			}
+
 			pthread_mutex_lock(&flashReqMutex);
 			curWritesInFlight --;
-			if ( curWritesInFlight < 0 ) {
-				fprintf(stderr, "LOG: **ERROR: Write requests in flight cannot be negative %d\n", curWritesInFlight );
-				curWritesInFlight = 0;
-			}
-			if ( writeTagTable[tag].busy == false ) {
-				fprintf(stderr, "LOG: **ERROR: received unused buffer Write done %d\n", tag);
-				testPassed = false;
-			}
+			//if ( curWritesInFlight < 0 ) {
+			//	fprintf(stderr, "LOG: **ERROR: Write requests in flight cannot be negative %d\n", curWritesInFlight );
+			//	curWritesInFlight = 0;
+			//}
+			//if ( writeTagTable[tag].busy == false ) {
+			//	fprintf(stderr, "LOG: **ERROR: received unused buffer Write done %d\n", tag);
+			//	testPassed = false;
+			//}
 			writeTagTable[tag].busy = false;
 			pthread_mutex_unlock(&flashReqMutex);
 		}
@@ -470,8 +476,8 @@ int main(int argc, const char **argv)
 	timespec start, now;
 	clock_gettime(CLOCK_REALTIME, & start);
 
-//	printf( "Test Write!\n" ); fflush(stdout);
-//
+	printf( "Test Write!\n" ); fflush(stdout);
+
 //	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
 //		// test only 128 segments due to some bad blocks (cannot allocate full 4096 segments)
 //		for (int segnum = 0; segnum < 2; segnum++) { // 2 segment only for now
@@ -487,20 +493,29 @@ int main(int argc, const char **argv)
 //			writePage(freeTag, lpa);
 //		}
 //	}
-//
-//	while (true) {
-//		usleep(100);
-//		if ( getNumWritesInFlight() == 0 ) break;
-//	}
-//
-//	// read back Map and Save to table.dump.1
-//	device->downloadMap(); // read table from FPGA
-//	if(writeFTLtoFile("table.dump.0", ftlPtr) != 0) {
-//		fprintf(stderr, "Write Failure\n");
-//		return -1;
-//	}
-//	sleep(1);
-//	printf( "Done writing table.dump.0\n" ); fflush(stdout);
+	int numLPA = 64 << 14;
+
+	for (int lpa = 0; lpa < numLPA; lpa++) {
+		writePage(waitIdleWriteBuffer(), lpa);
+	}
+
+	while (true) {
+		usleep(100);
+		if ( getNumWritesInFlight() == 0 ) break;
+	}
+
+	clock_gettime(CLOCK_REALTIME, & now);
+	fprintf(stderr, "LOG: finished writing! %f\n", timespec_diff_sec(start, now) );
+	fprintf(stderr, "SPEED: %f MB/s\n", (8192.0*numLPA/1000000)/timespec_diff_sec(start,now));
+
+	// read back Map and Save to table.dump.1
+	device->downloadMap(); // read table from FPGA
+	if(writeFTLtoFile("table.dump.0", ftlPtr) != 0) {
+		fprintf(stderr, "Write Failure\n");
+		return -1;
+	}
+	sleep(1);
+	printf( "Done writing table.dump.0\n" ); fflush(stdout);
 
 	printf( "Test Read!\n" ); fflush(stdout);
 	
@@ -512,7 +527,10 @@ int main(int argc, const char **argv)
 //			readPage(waitIdleReadBuffer(), lpa);
 //		}
 //	}
-	for (int lpa = 0; lpa < 2<<14; lpa++) {
+//
+	clock_gettime(CLOCK_REALTIME, & start);
+
+	for (int lpa = 0; lpa < numLPA; lpa++) {
 		readPage(waitIdleReadBuffer(), lpa);
 	}
 
@@ -520,6 +538,10 @@ int main(int argc, const char **argv)
 		usleep(100);
 		if ( getNumReadsInFlight() == 0 ) break;
 	}
+
+	clock_gettime(CLOCK_REALTIME, & now);
+	fprintf(stderr, "LOG: finished writing! %f\n", timespec_diff_sec(start, now) );
+	fprintf(stderr, "SPEED: %f MB/s\n", (8192.0*numLPA/1000000)/timespec_diff_sec(start,now));
 
 //	printf( "Test Erase!\n" ); fflush(stdout);
 //	for (int logblk = 0; logblk < NUM_LOGBLKS; logblk++){
@@ -549,9 +571,6 @@ int main(int argc, const char **argv)
 		if ( getNumReadsInFlight() == 0 ) break;
 	}
 	device->debugDumpReq(0);
-
-	clock_gettime(CLOCK_REALTIME, & now);
-	fprintf(stderr, "LOG: finished reading from page! %f\n", timespec_diff_sec(start, now) );
 
 	sleep(2);
 }

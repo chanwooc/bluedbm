@@ -20,7 +20,7 @@
 
 #define FPAGE_SIZE (8192*2)
 #define FPAGE_SIZE_VALID (8224)
-#define NUM_TAGS 64 //
+#define NUM_TAGS 128
 
 typedef enum {
 	UNINIT,
@@ -428,23 +428,23 @@ int main(int argc, const char **argv)
 
 	printf( "TEST ERASE STARTED!\n" ); fflush(stdout);
 
-//	//test erases
-//	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-//		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-//			for (int bus = 0; bus < NUM_BUSES; bus++){
-//				eraseBlock(bus, chip, blk, waitIdleEraseTag());
-//			}
-//		}
-//	}
-//
-//	while (true) {
-//		usleep(100);
-//		if ( getNumErasesInFlight() == 0 ) break;
-//	}
-//	printf( "TEST ERASE FINISHED!\n" ); fflush(stdout);
+	//test erases
+	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
+		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+			for (int bus = 0; bus < NUM_BUSES; bus++){
+				eraseBlock(bus, chip, blk, waitIdleEraseTag());
+			}
+		}
+	}
 
-	printf( "READ MANY PAGES STARTED!\n" ); fflush(stdout);
-	//read back erased pages
+	while (true) {
+		usleep(100);
+		if ( getNumErasesInFlight() == 0 ) break;
+	}
+	printf( "TEST ERASE FINISHED!\n" ); fflush(stdout);
+
+//	printf( "READ MANY PAGES STARTED!\n" ); fflush(stdout);
+//	//read back erased pages
 //	for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
 //	for (int pofs= 0; pofs < 256; pofs++) {
 //		for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
@@ -454,22 +454,22 @@ int main(int argc, const char **argv)
 //		}
 //	}
 //	}
-	for (unsigned int lpa=0; lpa < 1<<14; lpa++) {
-		unsigned int bus, chip, blk, page;
-		bus = lpa & 7;
-		chip = (lpa >> 3) & 7;
-		blk = lpa >> 14;
-		page = (lpa - (blk << 14)) >> 6;
-		readPage(bus, chip, blk, page, waitIdleReadBuffer());
-	}
-	
-	while (true) {
-			usleep(100);
-			if ( getNumReadsInFlight() == 0 ) break;
-	}
-
-	printf( "READ PAGES FINISHED!\n" ); fflush(stdout);
-
+//	for (unsigned int lpa=0; lpa < 1<<14; lpa++) {
+//		unsigned int bus, chip, blk, page;
+//		bus = lpa & 7;
+//		chip = (lpa >> 3) & 7;
+//		blk = lpa >> 14;
+//		page = (lpa - (blk << 14)) >> 6;
+//		readPage(bus, chip, blk, page, waitIdleReadBuffer());
+//	}
+//	
+//	while (true) {
+//			usleep(100);
+//			if ( getNumReadsInFlight() == 0 ) break;
+//	}
+//
+//	printf( "READ PAGES FINISHED!\n" ); fflush(stdout);
+//
 	int elapsed = 0;
 	while (true) {
 		usleep(100);
@@ -484,44 +484,42 @@ int main(int argc, const char **argv)
 	}
 	device->debugDumpReq(0);
 
-//	clock_gettime(CLOCK_REALTIME, & now);
+	uint8_t *tmpPtr = (uint8_t *)calloc(blkmapAlloc_sz*2, 1); // reserving 1 MB
+	blkmap      = (uint16_t(*)[NUM_CHANNELS*NUM_CHIPS]) (tmpPtr);
+	blkmgr      = (uint16_t(*)[NUM_CHIPS][NUM_BLOCKS])  (tmpPtr+blkmapAlloc_sz);
 
-//	uint8_t *tmpPtr = (uint8_t *)calloc(blkmapAlloc_sz*2, 1); // reserving 1 MB
-//	blkmap      = (uint16_t(*)[NUM_CHANNELS*NUM_CHIPS]) (tmpPtr);
-//	blkmgr      = (uint16_t(*)[NUM_CHIPS][NUM_BLOCKS])  (tmpPtr+blkmapAlloc_sz);
-//
-//	FILE *fp,*fp2;
-//	fp = fopen("badblockmap.txt", "w");
-//
-//	if (fp != NULL) {
-//		for (int bus = 0; bus < NUM_BUSES; bus++){
-//			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
-//				for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
-//					BadBlockEntry entry = badBlockTable[bus][chip][blk];
-//
-//					if (entry.eraseIssued == false)
-//						fprintf(stderr, "erase not issued @%d %d %d 0\n", bus, chip, blk);
-//					else
-//					{
-//						fprintf(fp, "%d %d %d %d %d\n", bus, chip, blk, entry.badFromErase, entry.badFromRead);
-//						blkmgr[bus][chip][blk] = (entry.badFromErase)?(3<<14):0;
-//					}
-//				}
-//			}
-//		}
-//	} else {
-//		fprintf(stderr, "couldn't open badblockmap.txt\n");
-//	}
-//
-//	fp2 = fopen("table.dump.0", "w");
-//
-//	if (fp2 != NULL) {
-//		fwrite(tmpPtr, blkmapAlloc_sz*2, 1, fp2);
-//	}
-//
-//	fclose(fp);
-//	fclose(fp2);
-//	free(tmpPtr);
+	FILE *fp,*fp2;
+	fp = fopen("badblockmap.txt", "w");
+
+	if (fp != NULL) {
+		for (int bus = 0; bus < NUM_BUSES; bus++){
+			for (int chip = 0; chip < CHIPS_PER_BUS; chip++){
+				for (int blk = 0; blk < BLOCKS_PER_CHIP; blk++){
+					BadBlockEntry entry = badBlockTable[bus][chip][blk];
+
+					if (entry.eraseIssued == false)
+						fprintf(stderr, "erase not issued @%d %d %d 0\n", bus, chip, blk);
+					else
+					{
+						fprintf(fp, "%d %d %d %d %d\n", bus, chip, blk, entry.badFromErase, entry.badFromRead);
+						blkmgr[bus][chip][blk] = (entry.badFromErase)?(3<<14):0;
+					}
+				}
+			}
+		}
+	} else {
+		fprintf(stderr, "couldn't open badblockmap.txt\n");
+	}
+
+	fp2 = fopen("table.dump.0", "w");
+
+	if (fp2 != NULL) {
+		fwrite(tmpPtr, blkmapAlloc_sz*2, 1, fp2);
+	}
+
+	fclose(fp);
+	fclose(fp2);
+	free(tmpPtr);
 
 	sleep(2);
 }
