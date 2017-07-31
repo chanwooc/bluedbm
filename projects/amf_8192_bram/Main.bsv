@@ -27,6 +27,7 @@ import BRAMFIFO::*;
 import BRAM::*;
 import GetPut::*;
 import ClientServer::*;
+import Connectable::*;
 
 import Vector::*;
 import List::*;
@@ -124,7 +125,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Reg#(Bool) started <- mkReg(False);
 	Reg#(Bit#(64)) cycleCnt <- mkReg(0);
 
-	FIFO#(FlashCmd) flashCmdQ <- mkSizedFIFO(valueOf(NumTags));
+	FIFO#(FlashCmd) flashCmdQ <- mkSizedFIFO(valueOf(NumTags)/8);
 	FIFO#(FTLCmd) ftlCmdQ <- mkSizedFIFO(valueOf(NumTags));
 
 	Vector#(NumTags, Reg#(BusT)) tag2busTable <- replicateM(mkRegU());
@@ -232,11 +233,11 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	//Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(16))) dmaWBurstPerPageCnts <- replicateM(mkReg(0));
 	Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(32))) wordPerPageCnts <- replicateM(mkReg(0));
 
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWrReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO make bigger?
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWriteReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));//TODO make bigger?
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFO);
+	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWrReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags)/8)); //TODO make bigger?
+	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWriteReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)/8));//TODO make bigger?
+	Vector#(NUM_FLASH_DMA_PORTS, FIFOF#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFOF);
 
-	Vector#(NUM_FLASH_DMA_PORTS, Reg#(TagT)) currTags <- replicateM(mkReg(0));
+//	Vector#(NUM_FLASH_DMA_PORTS, Reg#(TagT)) currTags <- replicateM(mkReg(0));
 
 	rule doEnqReadFromFlash;
 		if (delayReg==0) begin
@@ -335,22 +336,32 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		endrule
 
 		//dma response.get done; when enough has accumulated, send ack to sw
-		rule dmaWriterGetResponse;
+		rule dmaWriteGetResponse;
 			let weS = getWEServer(we,b);
 			let dummy <- weS.done.get;
-			let tagCnt = dmaWrReq2RespQ[b].first;
+			let tag = dmaWrReq2RespQ[b].first;
 			dmaWrReq2RespQ[b].deq;
-			$display("@%d Main.bsv: dma resp tag=%d", cycleCnt, (tagCnt));
-			dmaWriteDoneQs[b].enq(tagCnt);
+			$display("@%d Main.bsv: dma resp tag=%d", cycleCnt, tag);
+			dmaWriteDoneQs[b].enq(tag);
 		endrule
 
-		rule collectReadDone;
-			dmaWriteDoneQs[b].deq;
-			let tag = dmaWriteDoneQs[b].first;
-			indication.readDone(zeroExtend(tag), 0);
-		endrule
+//		rule collectReadDone;
+//			dmaWriteDoneQs[b].deq;
+//			let tag = dmaWriteDoneQs[b].first;
+//			indication.readDone(zeroExtend(tag), 0);
+//		endrule
 	end //for each bus
 
+	Vector#(NUM_FLASH_DMA_PORTS, PipeOut#(TagT)) dmaWriteDonePipes = map(toPipeOut, dmaWriteDoneQs);
+	FunnelPipe#(1, NUM_FLASH_DMA_PORTS, TagT, 2) readAckFunnel <- mkFunnelPipesPipelined(dmaWriteDonePipes);
+
+	FIFO#(TagT) readAckQ <- mkSizedFIFO(valueOf(NumTags));
+	mkConnection(toGet(readAckFunnel[0]), toPut(readAckQ));
+
+	rule sendReadDone;
+		let tag <- toGet(readAckQ).get();
+		indication.readDone(zeroExtend(tag), 0);
+	endrule
 
 	//--------------------------------------------
 	// Writes to Flash (DMA Reads)
@@ -457,7 +468,8 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	//--------------------------------------------
 
 	//Handle acks from controller
-	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
+//	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
+	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkSizedFIFO(valueOf(NumTags)/8);
 	rule handleControllerAck;
 		let ackStatus <- flashCtrl.user.ackStatus();
 		ackQ.enq(ackStatus);
