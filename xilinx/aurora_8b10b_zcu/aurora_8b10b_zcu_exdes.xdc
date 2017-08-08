@@ -51,15 +51,17 @@
 ################################################################################
 ## XDC generated for xczu9eg-ffvb1156-2 device
 # 275.0MHz GT Reference clock constraint
-create_clock -name GT_REFCLK1 -period 3.636	 [get_ports GT_REFCLK_P]
-   # Reference clock location
-   set_property LOC L8 [get_ports GT_REFCLK_P]
-   set_property LOC L7 [get_ports GT_REFCLK_N]
+create_clock -name GT_REFCLK1 -period 3.636	 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
 ####################### GT reference clock LOC #######################
+set_property LOC L8 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
+set_property LOC L7 [get_ports aurora_clk_fmc1_gtx_clk_n_v]
 
+# 20.0 ns period Board Clock Constraint -> changed to 110 MHz Derived Board Clock
+#create_clock -name auroraI_init_clk_i -period 20.0 [get_nets -hierarchical -filter { NAME =~ "*auroraIntraClockDiv4_CLK_slowClock" }]
 
-# 20.0 ns period Board Clock Constraint 
-create_clock -name init_clk_i -period 20.0 [get_ports INIT_CLK_P]
+# I guess below should be inferred automatically 
+# 110MHz user_clk -> 4.4Gbps*8/10*4 = 14.08Gbps = 128bit * 110M
+#create_clock -name auroraI_user_clk_i -period 9.091  [get_pins -hierarchical -regexp {.*/aurora_module_i/clock_module_i/user_clk_buf_i/O}]
 
 
 ###### CDC in RESET_LOGIC from INIT_CLK to USER_CLK ##############
@@ -121,6 +123,72 @@ set_false_path -through [get_pins -hierarchical -filter {NAME =~ *clock_module_i
     
 ##################################################################
 
+# GT LOC override
+# UltraScale FPGAs Transceivers Wizard IP core-level XDC file
+# ----------------------------------------------------------------------------------------------------------------------
 
+# Commands for enabled transceiver GTHE4_CHANNEL_X1Y4
+# ----------------------------------------------------------------------------------------------------------------------
 
-  
+# Before replacing, place them to the other positions
+set_property LOC GTHE4_CHANNEL_X1Y8 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[0].GTHE4_CHANNEL_PRIM_INST}]
+set_property LOC GTHE4_CHANNEL_X1Y9 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[1].GTHE4_CHANNEL_PRIM_INST}]
+set_property LOC GTHE4_CHANNEL_X1Y10 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[2].GTHE4_CHANNEL_PRIM_INST}]
+set_property LOC GTHE4_CHANNEL_X1Y11 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[3].GTHE4_CHANNEL_PRIM_INST}]
+#
+
+## Channel primitive location constraint
+# Prev   : GT0 = X1Y4 (MGT0, DP6)   (X)
+# Correct: GT0 = X1Y7 (MGT3, DP4)
+set_property LOC GTHE4_CHANNEL_X1Y7 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[0].GTHE4_CHANNEL_PRIM_INST}]
+#
+## Channel primitive serial data pin location constraints
+## (Provided as comments for your reference. The channel primitive location constraint is sufficient.)
+##set_property package_pin T1 [get_ports gthrxn_in[0]]
+##set_property package_pin T2 [get_ports gthrxp_in[0]]
+##set_property package_pin R3 [get_ports gthtxn_out[0]]
+##set_property package_pin R4 [get_ports gthtxp_out[0]]
+#
+## Commands for enabled transceiver GTHE4_CHANNEL_X1Y5
+## ----------------------------------------------------------------------------------------------------------------------
+#
+## Channel primitive location constraint
+# Prev   : GT1 = X1Y5 (MGT1, DP5)
+set_property LOC GTHE4_CHANNEL_X1Y5 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[1].GTHE4_CHANNEL_PRIM_INST}]
+#
+## Channel primitive serial data pin location constraints
+## (Provided as comments for your reference. The channel primitive location constraint is sufficient.)
+##set_property package_pin P1 [get_ports gthrxn_in[1]]
+##set_property package_pin P2 [get_ports gthrxp_in[1]]
+##set_property package_pin P5 [get_ports gthtxn_out[1]]
+##set_property package_pin P6 [get_ports gthtxp_out[1]]
+#
+## Commands for enabled transceiver GTHE4_CHANNEL_X1Y6
+## ----------------------------------------------------------------------------------------------------------------------
+#
+## Channel primitive location constraint
+# Prev   : GT2 = X1Y6 (MGT2, DP7)   (X)
+# Correct: GT2 = X1Y4 (MGT0, DP6)
+set_property LOC GTHE4_CHANNEL_X1Y4 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[2].GTHE4_CHANNEL_PRIM_INST}]
+#
+## Channel primitive serial data pin location constraints
+## (Provided as comments for your reference. The channel primitive location constraint is sufficient.)
+##set_property package_pin M1 [get_ports gthrxn_in[2]]
+##set_property package_pin M2 [get_ports gthrxp_in[2]]
+##set_property package_pin N3 [get_ports gthtxn_out[2]]
+##set_property package_pin N4 [get_ports gthtxp_out[2]]
+#
+## Commands for enabled transceiver GTHE4_CHANNEL_X1Y7
+## ----------------------------------------------------------------------------------------------------------------------
+#
+## Channel primitive location constraint
+# Prev   : GT3 = X1Y7 (MGT3, DP4)   (X)
+# Correct: GT3 = X1Y6 (MGT2, DP7)
+set_property LOC GTHE4_CHANNEL_X1Y6 [get_cells -hierarchical -filter {NAME =~ *gen_channel_container[25].*gen_gthe4_channel_inst[3].GTHE4_CHANNEL_PRIM_INST}]
+#
+## Channel primitive serial data pin location constraints
+## (Provided as comments for your reference. The channel primitive location constraint is sufficient.)
+##set_property package_pin L3 [get_ports gthrxn_in[3]]
+##set_property package_pin L4 [get_ports gthrxp_in[3]]
+##set_property package_pin M5 [get_ports gthtxn_out[3]]
+##set_property package_pin M6 [get_ports gthtxp_out[3]]

@@ -62,24 +62,39 @@
 (* DowngradeIPIdentifiedWarnings="yes" *)
 module aurora_8b10b_zcu_exdes #
 (
-     parameter   USE_CORE_TRAFFIC     = 1,
+     parameter   USE_CORE_TRAFFIC     = 0,
      parameter   USE_CHIPSCOPE        = 0
 )
 (
+	//Chanwoo IO
+	RX_DATA,
+	rx_en,
+	rx_rdy,
+
+	TX_DATA,
+	tx_en,
+	tx_rdy,
+
+	USER_CLK,
+	USER_RST,
+	USER_RST_N,
+
     // User IO
-    RESET,
+    RESET_N,   // RESET -> RESET_N (Chanwoo)
     HARD_ERR,
     SOFT_ERR,
     ERR_COUNT,
 
     LANE_UP,
     CHANNEL_UP,
-    INIT_CLK_P,
-    INIT_CLK_N,
-    GT_RESET_IN,
+//    INIT_CLK_P,
+//    INIT_CLK_N,
+	INIT_CLK_IN, // P,N -> IN
+    GT_RESET_N,  // IN->N
 
     GT_REFCLK_P,
     GT_REFCLK_N,
+//    GT_REFCLK_IN, // P,N -> IN
     // GT I/O
     RXP,
     RXN,
@@ -89,11 +104,25 @@ module aurora_8b10b_zcu_exdes #
 
 
 //***********************************Port Declarations*******************************
+	//Chanwoo IO
+	output [0:127] RX_DATA;
+	input rx_en;
+	output rx_rdy;
+
+	input [0:127] TX_DATA;
+	input tx_en;
+	output tx_rdy;
+
+	output USER_CLK;
+	output USER_RST;
+	output USER_RST_N;
+
     // User I/O
-input              RESET;
-input              INIT_CLK_P;
-input              INIT_CLK_N;
-input              GT_RESET_IN;
+input              RESET_N; // RESET -> RESET_N (Chanwoo)
+//input              INIT_CLK_P;
+//input              INIT_CLK_N;
+input INIT_CLK_IN; // P,N -> IN
+input              GT_RESET_N; // IN -> N (Chanwoo)
 output             HARD_ERR;
 output             SOFT_ERR;
 output  [0:7]      ERR_COUNT;
@@ -104,6 +133,37 @@ output             CHANNEL_UP;
     // Clocks
 input              GT_REFCLK_P;
 input              GT_REFCLK_N;
+//input GT_REFCLK_IN; //Chanwoo
+
+// wjun
+
+	reg [0:127] RX_DATA_delay;
+	reg        rx_rdy_delay;
+
+	wire RESET;
+	assign RESET = ~RESET_N;
+	wire GT_RESET_IN;
+	assign GT_RESET_IN = ~GT_RESET_N;
+	assign USER_CLK = user_clk_i;
+	assign USER_RST = system_reset_i;
+	assign USER_RST_N = !system_reset_i;
+	
+	assign tx_tvalid_i = tx_en;
+	assign tx_rdy = tx_tready_i && channel_up_i && !system_reset_i ;
+	assign tx_data_i = TX_DATA;
+	
+	assign RX_DATA = RX_DATA_delay;
+	assign rx_rdy = rx_rdy_delay;
+
+	always @ (posedge user_clk_i) begin
+		rx_rdy_delay <= !system_reset_i && channel_up_i && rx_tvalid_i;
+		RX_DATA_delay <= rx_data_i;
+	end
+
+	assign reset_i = RESET;
+	assign  gtreset_vio_o =   GT_RESET_IN;
+	assign  loopback_vio_o =   3'b000;
+
 
 
     // GT Serial I/O
@@ -120,12 +180,12 @@ reg     [0:3]      LANE_UP;
 reg                CHANNEL_UP;
 //********************************Wire Declarations**********************************
     // Stream TX Interface
-(* mark_debug = "true" *) wire    [0:127]    tx_d_i;
-wire               tx_src_rdy_n_i;
-wire               tx_dst_rdy_n_i;
+//(* mark_debug = "true" *) wire    [0:127]    tx_d_i;
+//wire               tx_src_rdy_n_i;
+//wire               tx_dst_rdy_n_i;
     // Stream RX Interface
-wire    [0:127]    rx_d_i;
-wire               rx_src_rdy_n_i;
+//wire    [0:127]    rx_d_i;
+//wire               rx_src_rdy_n_i;
 
     // Error Detection Interface
 (* mark_debug = "true" *)wire               hard_err_i;
@@ -214,23 +274,25 @@ wire               tx_tready_i;
     // RX AXI PDU I/F wires
 wire    [0:127]    rx_data_i;
 wire               rx_tvalid_i;
-    wire               INIT_CLK_IN;
-   wire  drpclk_i;
+//    wire               INIT_CLK_IN;
+//   wire  drpclk_i;
    //SLACK Registers
    reg    [0:3]      lane_up_r;
    reg    [0:3]      lane_up_r2;
 //*********************************Main Body of Code**********************************
 
-  IBUFDS init_clk_ibufg_i
-  (
-   .I(INIT_CLK_P),
-   .IB(INIT_CLK_N),
-   .O(INIT_CLK_IN)
-  );
+//  IBUFDS init_clk_ibufg_i
+//  (
+//   .I(INIT_CLK_P),
+//   .IB(INIT_CLK_N),
+//   .O(INIT_CLK_IN)
+//  );
 
-  BUFG init_clk_bufg
-   (.O   (init_clk_i),
-    .I   (INIT_CLK_IN));
+// BUFG in mkAuroraIntra
+assign init_clk_i = INIT_CLK_IN;
+//  BUFG init_clk_bufg
+//   (.O   (init_clk_i),
+//    .I   (INIT_CLK_IN));
  
 
 
@@ -286,8 +348,7 @@ assign  di_in_lane3_i     =  16'h0;
 assign  dwe_in_lane3_i    =  1'b0;
 //___________________________Module Instantiations_________________________________
 
-    aurora_8b10b_zcu_support
-    aurora_module_i
+    aurora_8b10b_zcu_support aurora_module_i
     (
         // AXI TX Interface
         .s_axi_tx_tdata(tx_data_i),
@@ -306,6 +367,7 @@ assign  dwe_in_lane3_i    =  1'b0;
  
         .gt_refclk1_p(GT_REFCLK_P),
         .gt_refclk1_n(GT_REFCLK_N),
+        //.gt_refclk1_in(GT_REFCLK_IN), // Chanwoo
         // Error Detection Interface
         .hard_err(hard_err_i),
         .soft_err(soft_err_i),
@@ -354,345 +416,345 @@ assign  dwe_in_lane3_i    =  1'b0;
         .link_reset_out(link_reset_i)
     );
 
-generate
- if (USE_CORE_TRAFFIC==1)
- begin : traffic
-
-    //_____________________________ TX AXI SHIM _______________________________
-    aurora_8b10b_zcu_LL_TO_AXI_EXDES #
-    (
-       .DATA_WIDTH(128),
-       .USE_4_NFC (0),
-       .STRB_WIDTH(16),
-       .REM_WIDTH (4)
-    )
-
-    frame_gen_ll_to_axi_pdu_i
-    (
-     // LocalLink input Interface
-     .LL_IP_DATA(tx_d_i),
-     .LL_IP_SOF_N(),
-     .LL_IP_EOF_N(),
-     .LL_IP_REM(),
-     .LL_IP_SRC_RDY_N(tx_src_rdy_n_i),
-     .LL_OP_DST_RDY_N(tx_dst_rdy_n_i),
-
-     // AXI4-S output signals
-     .AXI4_S_OP_TVALID(tx_tvalid_i),
-     .AXI4_S_OP_TDATA(tx_data_i),
-     .AXI4_S_OP_TKEEP(),
-     .AXI4_S_OP_TLAST(),
-     .AXI4_S_IP_TREADY(tx_tready_i)
-    );
-
-    //Connect a frame generator to the TX User interface
-    aurora_8b10b_zcu_FRAME_GEN frame_gen_i
-    (
-        // User Interface
-        .TX_D(tx_d_i), 
-        .TX_SRC_RDY_N(tx_src_rdy_n_i),
-        .TX_DST_RDY_N(tx_dst_rdy_n_i),
-
-
-        // System Interface
-        .USER_CLK(user_clk_i),      
-        .RESET(system_reset_i),
-        .CHANNEL_UP(channel_up_r)
-    );
-    //_____________________________ RX AXI SHIM _______________________________
-    aurora_8b10b_zcu_AXI_TO_LL_EXDES #
-    (
-       .DATA_WIDTH(128),
-       .STRB_WIDTH(16),
-       .REM_WIDTH (4)
-    )
-    frame_chk_axi_to_ll_pdu_i
-    (
-     // AXI4-S input signals
-     .AXI4_S_IP_TX_TVALID(rx_tvalid_i),
-     .AXI4_S_IP_TX_TREADY(),
-     .AXI4_S_IP_TX_TDATA(rx_data_i),
-     .AXI4_S_IP_TX_TKEEP(),
-     .AXI4_S_IP_TX_TLAST(),
-
-     // LocalLink output Interface
-     .LL_OP_DATA(rx_d_i),
-     .LL_OP_SOF_N(),
-     .LL_OP_EOF_N() ,
-     .LL_OP_REM() ,
-     .LL_OP_SRC_RDY_N(rx_src_rdy_n_i),
-     .LL_IP_DST_RDY_N(1'b0),
-
-     // System Interface
-     .USER_CLK(user_clk_i),      
-     .RESET(system_reset_i),
-     .CHANNEL_UP(channel_up_r)
-     );
-
-    aurora_8b10b_zcu_FRAME_CHECK frame_check_i
-    (
-        // User Interface
-        .RX_D(rx_d_i), 
-        .RX_SRC_RDY_N(rx_src_rdy_n_i),
-
-        // System Interface
-        .USER_CLK(user_clk_i),      
-        .RESET(system_reset_i),
-        .CHANNEL_UP(channel_up_r),
-        .ERR_COUNT(err_count_i)
-    );   
- 
- end //end USE_CORE_TRAFFIC=1 block
- else
- begin: no_traffic
-     //define traffic generation modules here
- end //end USE_CORE_TRAFFIC=0 block
-
-endgenerate //End generate for USE_CORE_TRAFFIC
-
-
-generate
-if (USE_CHIPSCOPE==1)
-begin : chipscope1
-
-
-assign lane_up_i_i = &lane_up_i;
-assign tx_lock_i_i = tx_lock_i;
-
-    // Shared VIO Inputs
-        assign  sync_in_i[15:0]         =  tx_d_i;
-        assign  sync_in_i[31:16]        =  rx_d_i;
-        assign  sync_in_i[39:32]        =  err_count_i;
-        assign  sync_in_i[53:40]        =  14'd0;
-        assign  sync_in_i[54]           =  link_reset_i;
-        assign  sync_in_i[55]           =  rx_resetdone_i;
-        assign  sync_in_i[56]           =  tx_resetdone_i;
-        assign  sync_in_i[57]           =  1'b0;
-        assign  sync_in_i[58]           =  soft_err_i;
-        assign  sync_in_i[59]           =  hard_err_i;
-        assign  sync_in_i[60]           =  tx_lock_i_i;
-        assign  sync_in_i[61]           =  pll_not_locked_i;
-        assign  sync_in_i[62]           =  channel_up_r;
-        assign  sync_in_i[63]           =  lane_up_i_i;
-
-always @ (posedge user_clk_i)
-begin
-  lane_up_i_i_r <= lane_up_i_i;
-end
-
-  aurora_8b10b_zcu_cdc_sync_exdes
-    #(
-       .c_cdc_type      (1             ),   
-       .c_flop_input    (1             ),  
-       .c_reset_state   (0             ),  
-       .c_single_bit    (1             ),  
-       .c_vector_width  (2             ),  
-       .c_mtbf_stages   (3              )
-     )channel_up_vio_cdc_sync_exdes 
-     (
-       .prmry_aclk      (user_clk_i        ),
-       .prmry_rst_n     (1'b1              ),
-       .prmry_in        (channel_up_r      ),
-       .prmry_vect_in   (2'd0              ),
-       .scndry_aclk     (init_clk_i        ),
-       .scndry_rst_n    (1'b1              ),
-       .prmry_ack       (                  ),
-       .scndry_out      (channel_up_r_vio  ),
-       .scndry_vect_out (                  ) 
-      );
-      
-  aurora_8b10b_zcu_cdc_sync_exdes
-     #(
-        .c_cdc_type      (1             ),   
-        .c_flop_input    (1             ),  
-        .c_reset_state   (0             ),  
-        .c_single_bit    (1             ),  
-        .c_vector_width  (2             ),  
-        .c_mtbf_stages   (3              )
-      )lane_up_vio_cdc_sync_exdes 
-      (
-        .prmry_aclk      (user_clk_i        ),
-        .prmry_rst_n     (1'b1              ),
-        .prmry_in        (lane_up_i_i_r     ),
-        .prmry_vect_in   (2'd0              ),
-        .scndry_aclk     (init_clk_i        ),
-        .scndry_rst_n    (1'b1              ),
-        .prmry_ack       (                  ),
-        .scndry_out      (lane_up_i_i_vio   ),
-        .scndry_vect_out (                  ) 
-       );
-   
-  aurora_8b10b_zcu_cdc_sync_exdes
-       #(
-          .c_cdc_type      (1             ),   
-          .c_flop_input    (1             ),  
-          .c_reset_state   (0             ),  
-          .c_single_bit    (1             ),  
-          .c_vector_width  (2             ),  
-          .c_mtbf_stages   (3              )
-        )tx_lock_vio_cdc_sync_exdes
-        (
-          .prmry_aclk      (user_clk_i        ),
-          .prmry_rst_n     (1'b1              ),
-          .prmry_in        (tx_lock_i_i       ),
-          .prmry_vect_in   (2'd0              ),
-          .scndry_aclk     (init_clk_i        ),
-          .scndry_rst_n    (1'b1              ),
-          .prmry_ack       (                  ),
-          .scndry_out      (tx_lock_i_i_vio   ),
-          .scndry_vect_out (                  ) 
-         );
-            
-  aurora_8b10b_zcu_cdc_sync_exdes
-       #(
-          .c_cdc_type      (1             ),   
-          .c_flop_input    (1             ),  
-          .c_reset_state   (0             ),  
-          .c_single_bit    (1             ),  
-          .c_vector_width  (2             ),  
-          .c_mtbf_stages   (3              )
-        )system_reset_vio_cdc_sync_exdes
-        (
-          .prmry_aclk      (init_clk_i        ),
-          .prmry_rst_n     (1'b1              ),
-          .prmry_in        (sysreset_vio_i    ),
-          .prmry_vect_in   (2'd0              ),
-          .scndry_aclk     (user_clk_i        ),
-          .scndry_rst_n    (1'b1              ),
-          .prmry_ack       (                  ),
-          .scndry_out      (sysreset_i        ),
-          .scndry_vect_out (                  ) 
-         );
-
-  //-----------------------------------------------------------------
-  //  VIO core instance
-  //-----------------------------------------------------------------
-vio_8series i_vio 
-(
-  .clk(init_clk_i), // input CLK
-  .probe_in0(channel_up_r_vio), // input [0 : 0] PROBE_IN0
-  .probe_in1(lane_up_i_i_vio), // input [0 : 0] PROBE_IN1
-  .probe_in2(tx_lock_i_i_vio), // input [0 : 0] PROBE_IN2
-  .probe_out0(sysreset_vio_i), // output [0 : 0] PROBE_OUT0
-  .probe_out1(gtreset_vio_i), // output [0 : 0] PROBE_OUT1
-  .probe_out2(loopback_vio_i) // output [2 : 0] PROBE_OUT2
-);
-
-  //-----------------------------------------------------------------
-  //  ILA core instance
-  //-----------------------------------------------------------------
-  aurora_8b10b_zcu_cdc_sync_exdes
-     #(
-        .c_cdc_type      (1             ),   
-        .c_flop_input    (1             ),  
-        .c_reset_state   (0             ),  
-        .c_single_bit    (1             ),  
-        .c_vector_width  (2             ),  
-        .c_mtbf_stages  (3              )
-      )tx_resetdone_ila_cdc_sync_exdes 
-      (
-        .prmry_aclk      (init_clk_i        ),
-        .prmry_rst_n     (1'b1              ),
-        .prmry_in        (tx_resetdone_i    ),
-        .prmry_vect_in   (2'd0              ),
-        .scndry_aclk     (user_clk_i        ),
-        .scndry_rst_n    (1'b1              ),
-        .prmry_ack       (                  ),
-        .scndry_out      (tx_resetdone_ila  ),
-        .scndry_vect_out (                  ) 
-      );
-  aurora_8b10b_zcu_cdc_sync_exdes
-     #(
-        .c_cdc_type      (1             ),   
-        .c_flop_input    (1             ),  
-        .c_reset_state   (0             ),  
-        .c_single_bit    (1             ),  
-        .c_vector_width  (2             ),  
-        .c_mtbf_stages   (3              )
-      )link_reset_ila_cdc_sync_exdes 
-      (
-        .prmry_aclk      (init_clk_i        ),
-        .prmry_rst_n     (1'b1              ),
-        .prmry_in        (link_reset_i      ),
-        .prmry_vect_in   (2'd0              ),
-        .scndry_aclk     (user_clk_i        ),
-        .scndry_rst_n    (1'b1              ),
-        .prmry_ack       (                  ),
-        .scndry_out      (link_reset_ila    ),
-        .scndry_vect_out (                  ) 
-      );
-  aurora_8b10b_zcu_cdc_sync_exdes
-     #(
-        .c_cdc_type      (1             ),   
-        .c_flop_input    (1             ),  
-        .c_reset_state   (0             ),  
-        .c_single_bit    (1             ),  
-        .c_vector_width  (2             ),  
-        .c_mtbf_stages   (3              )
-      )pll_not_locked_ila_cdc_sync_exdes 
-      (
-        .prmry_aclk      (init_clk_i        ),
-        .prmry_rst_n     (1'b1              ),
-        .prmry_in        (pll_not_locked_i  ),
-        .prmry_vect_in   (2'd0              ),
-        .scndry_aclk     (user_clk_i        ),
-        .scndry_rst_n    (1'b1              ),
-        .prmry_ack       (                  ),
-        .scndry_out      (pll_not_locked_ila),
-        .scndry_vect_out (                  ) 
-      );
- 
-  aurora_8b10b_zcu_cdc_sync_exdes
-     #(
-        .c_cdc_type      (1             ),   
-        .c_flop_input    (1             ),  
-        .c_reset_state   (0             ),  
-        .c_single_bit    (1             ),  
-        .c_vector_width  (2             ),  
-        .c_mtbf_stages   (3              )
-      )tx_lock_i_ila_cdc_sync_exdes 
-      (
-        .prmry_aclk      (init_clk_i        ),
-        .prmry_rst_n     (1'b1              ),
-        .prmry_in        (tx_lock_i_i       ),
-        .prmry_vect_in   (2'd0              ),
-        .scndry_aclk     (user_clk_i        ),
-        .scndry_rst_n    (1'b1              ),
-        .prmry_ack       (                  ),
-        .scndry_out      (tx_lock_i_ila     ),
-        .scndry_vect_out (                  ) 
-      );
-      
-ila_8series i_ila (
-  .clk(user_clk_i), // input CLK
-  .probe0({lane_up_i_i_r,channel_up_r,pll_not_locked_ila,tx_lock_i_ila,hard_err_i,soft_err_i,1'b0,tx_resetdone_ila,rx_resetdone_i,link_reset_ila,14'd0,err_count_i,rx_d_i[0:15],tx_d_i[0:15]}) // input [63 : 0] PROBE0
-);
-
-end //end USE_CHIPSCOPE=1 generate section
-else
-begin : no_chipscope1
-                                                                                                                                                                      
-    // Shared VIO Inputs
-        assign  sync_in_i         =  64'h0;
-
-end
-
- if (USE_CHIPSCOPE==1)
- begin : chipscope2
-     // Shared VIO Outputs
- assign  reset_i =   RESET | sysreset_i;
- assign  gtreset_vio_o =   GT_RESET_IN | gtreset_vio_i;
- assign  loopback_vio_o =   3'b000 | loopback_vio_i;
- end //end USE_CHIPSCOPE=1 block
- else
- begin: no_chipscope2
- assign  reset_i =   RESET;
- assign  gtreset_vio_o =   GT_RESET_IN;
- assign  loopback_vio_o =   3'b000;
- end //end USE_CHIPSCOPE=0 block
-
-endgenerate //End generate for USE_CHIPSCOPE
+//generate
+// if (USE_CORE_TRAFFIC==1)
+// begin : traffic
+//
+//    //_____________________________ TX AXI SHIM _______________________________
+//    aurora_8b10b_zcu_LL_TO_AXI_EXDES #
+//    (
+//       .DATA_WIDTH(128),
+//       .USE_4_NFC (0),
+//       .STRB_WIDTH(16),
+//       .REM_WIDTH (4)
+//    )
+//
+//    frame_gen_ll_to_axi_pdu_i
+//    (
+//     // LocalLink input Interface
+//     .LL_IP_DATA(tx_d_i),
+//     .LL_IP_SOF_N(),
+//     .LL_IP_EOF_N(),
+//     .LL_IP_REM(),
+//     .LL_IP_SRC_RDY_N(tx_src_rdy_n_i),
+//     .LL_OP_DST_RDY_N(tx_dst_rdy_n_i),
+//
+//     // AXI4-S output signals
+//     .AXI4_S_OP_TVALID(tx_tvalid_i),
+//     .AXI4_S_OP_TDATA(tx_data_i),
+//     .AXI4_S_OP_TKEEP(),
+//     .AXI4_S_OP_TLAST(),
+//     .AXI4_S_IP_TREADY(tx_tready_i)
+//    );
+//
+//    //Connect a frame generator to the TX User interface
+//    aurora_8b10b_zcu_FRAME_GEN frame_gen_i
+//    (
+//        // User Interface
+//        .TX_D(tx_d_i), 
+//        .TX_SRC_RDY_N(tx_src_rdy_n_i),
+//        .TX_DST_RDY_N(tx_dst_rdy_n_i),
+//
+//
+//        // System Interface
+//        .USER_CLK(user_clk_i),      
+//        .RESET(system_reset_i),
+//        .CHANNEL_UP(channel_up_r)
+//    );
+//    //_____________________________ RX AXI SHIM _______________________________
+//    aurora_8b10b_zcu_AXI_TO_LL_EXDES #
+//    (
+//       .DATA_WIDTH(128),
+//       .STRB_WIDTH(16),
+//       .REM_WIDTH (4)
+//    )
+//    frame_chk_axi_to_ll_pdu_i
+//    (
+//     // AXI4-S input signals
+//     .AXI4_S_IP_TX_TVALID(rx_tvalid_i),
+//     .AXI4_S_IP_TX_TREADY(),
+//     .AXI4_S_IP_TX_TDATA(rx_data_i),
+//     .AXI4_S_IP_TX_TKEEP(),
+//     .AXI4_S_IP_TX_TLAST(),
+//
+//     // LocalLink output Interface
+//     .LL_OP_DATA(rx_d_i),
+//     .LL_OP_SOF_N(),
+//     .LL_OP_EOF_N() ,
+//     .LL_OP_REM() ,
+//     .LL_OP_SRC_RDY_N(rx_src_rdy_n_i),
+//     .LL_IP_DST_RDY_N(1'b0),
+//
+//     // System Interface
+//     .USER_CLK(user_clk_i),      
+//     .RESET(system_reset_i),
+//     .CHANNEL_UP(channel_up_r)
+//     );
+//
+//    aurora_8b10b_zcu_FRAME_CHECK frame_check_i
+//    (
+//        // User Interface
+//        .RX_D(rx_d_i), 
+//        .RX_SRC_RDY_N(rx_src_rdy_n_i),
+//
+//        // System Interface
+//        .USER_CLK(user_clk_i),      
+//        .RESET(system_reset_i),
+//        .CHANNEL_UP(channel_up_r),
+//        .ERR_COUNT(err_count_i)
+//    );   
+// 
+// end //end USE_CORE_TRAFFIC=1 block
+// else
+// begin: no_traffic
+//     //define traffic generation modules here
+// end //end USE_CORE_TRAFFIC=0 block
+//
+//endgenerate //End generate for USE_CORE_TRAFFIC
+//
+//
+//generate
+//if (USE_CHIPSCOPE==1)
+//begin : chipscope1
+//
+//
+//assign lane_up_i_i = &lane_up_i;
+//assign tx_lock_i_i = tx_lock_i;
+//
+//    // Shared VIO Inputs
+//        assign  sync_in_i[15:0]         =  tx_d_i;
+//        assign  sync_in_i[31:16]        =  rx_d_i;
+//        assign  sync_in_i[39:32]        =  err_count_i;
+//        assign  sync_in_i[53:40]        =  14'd0;
+//        assign  sync_in_i[54]           =  link_reset_i;
+//        assign  sync_in_i[55]           =  rx_resetdone_i;
+//        assign  sync_in_i[56]           =  tx_resetdone_i;
+//        assign  sync_in_i[57]           =  1'b0;
+//        assign  sync_in_i[58]           =  soft_err_i;
+//        assign  sync_in_i[59]           =  hard_err_i;
+//        assign  sync_in_i[60]           =  tx_lock_i_i;
+//        assign  sync_in_i[61]           =  pll_not_locked_i;
+//        assign  sync_in_i[62]           =  channel_up_r;
+//        assign  sync_in_i[63]           =  lane_up_i_i;
+//
+//always @ (posedge user_clk_i)
+//begin
+//  lane_up_i_i_r <= lane_up_i_i;
+//end
+//
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//    #(
+//       .c_cdc_type      (1             ),   
+//       .c_flop_input    (1             ),  
+//       .c_reset_state   (0             ),  
+//       .c_single_bit    (1             ),  
+//       .c_vector_width  (2             ),  
+//       .c_mtbf_stages   (3              )
+//     )channel_up_vio_cdc_sync_exdes 
+//     (
+//       .prmry_aclk      (user_clk_i        ),
+//       .prmry_rst_n     (1'b1              ),
+//       .prmry_in        (channel_up_r      ),
+//       .prmry_vect_in   (2'd0              ),
+//       .scndry_aclk     (init_clk_i        ),
+//       .scndry_rst_n    (1'b1              ),
+//       .prmry_ack       (                  ),
+//       .scndry_out      (channel_up_r_vio  ),
+//       .scndry_vect_out (                  ) 
+//      );
+//      
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//     #(
+//        .c_cdc_type      (1             ),   
+//        .c_flop_input    (1             ),  
+//        .c_reset_state   (0             ),  
+//        .c_single_bit    (1             ),  
+//        .c_vector_width  (2             ),  
+//        .c_mtbf_stages   (3              )
+//      )lane_up_vio_cdc_sync_exdes 
+//      (
+//        .prmry_aclk      (user_clk_i        ),
+//        .prmry_rst_n     (1'b1              ),
+//        .prmry_in        (lane_up_i_i_r     ),
+//        .prmry_vect_in   (2'd0              ),
+//        .scndry_aclk     (init_clk_i        ),
+//        .scndry_rst_n    (1'b1              ),
+//        .prmry_ack       (                  ),
+//        .scndry_out      (lane_up_i_i_vio   ),
+//        .scndry_vect_out (                  ) 
+//       );
+//   
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//       #(
+//          .c_cdc_type      (1             ),   
+//          .c_flop_input    (1             ),  
+//          .c_reset_state   (0             ),  
+//          .c_single_bit    (1             ),  
+//          .c_vector_width  (2             ),  
+//          .c_mtbf_stages   (3              )
+//        )tx_lock_vio_cdc_sync_exdes
+//        (
+//          .prmry_aclk      (user_clk_i        ),
+//          .prmry_rst_n     (1'b1              ),
+//          .prmry_in        (tx_lock_i_i       ),
+//          .prmry_vect_in   (2'd0              ),
+//          .scndry_aclk     (init_clk_i        ),
+//          .scndry_rst_n    (1'b1              ),
+//          .prmry_ack       (                  ),
+//          .scndry_out      (tx_lock_i_i_vio   ),
+//          .scndry_vect_out (                  ) 
+//         );
+//            
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//       #(
+//          .c_cdc_type      (1             ),   
+//          .c_flop_input    (1             ),  
+//          .c_reset_state   (0             ),  
+//          .c_single_bit    (1             ),  
+//          .c_vector_width  (2             ),  
+//          .c_mtbf_stages   (3              )
+//        )system_reset_vio_cdc_sync_exdes
+//        (
+//          .prmry_aclk      (init_clk_i        ),
+//          .prmry_rst_n     (1'b1              ),
+//          .prmry_in        (sysreset_vio_i    ),
+//          .prmry_vect_in   (2'd0              ),
+//          .scndry_aclk     (user_clk_i        ),
+//          .scndry_rst_n    (1'b1              ),
+//          .prmry_ack       (                  ),
+//          .scndry_out      (sysreset_i        ),
+//          .scndry_vect_out (                  ) 
+//         );
+//
+//  //-----------------------------------------------------------------
+//  //  VIO core instance
+//  //-----------------------------------------------------------------
+//vio_8series i_vio 
+//(
+//  .clk(init_clk_i), // input CLK
+//  .probe_in0(channel_up_r_vio), // input [0 : 0] PROBE_IN0
+//  .probe_in1(lane_up_i_i_vio), // input [0 : 0] PROBE_IN1
+//  .probe_in2(tx_lock_i_i_vio), // input [0 : 0] PROBE_IN2
+//  .probe_out0(sysreset_vio_i), // output [0 : 0] PROBE_OUT0
+//  .probe_out1(gtreset_vio_i), // output [0 : 0] PROBE_OUT1
+//  .probe_out2(loopback_vio_i) // output [2 : 0] PROBE_OUT2
+//);
+//
+//  //-----------------------------------------------------------------
+//  //  ILA core instance
+//  //-----------------------------------------------------------------
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//     #(
+//        .c_cdc_type      (1             ),   
+//        .c_flop_input    (1             ),  
+//        .c_reset_state   (0             ),  
+//        .c_single_bit    (1             ),  
+//        .c_vector_width  (2             ),  
+//        .c_mtbf_stages  (3              )
+//      )tx_resetdone_ila_cdc_sync_exdes 
+//      (
+//        .prmry_aclk      (init_clk_i        ),
+//        .prmry_rst_n     (1'b1              ),
+//        .prmry_in        (tx_resetdone_i    ),
+//        .prmry_vect_in   (2'd0              ),
+//        .scndry_aclk     (user_clk_i        ),
+//        .scndry_rst_n    (1'b1              ),
+//        .prmry_ack       (                  ),
+//        .scndry_out      (tx_resetdone_ila  ),
+//        .scndry_vect_out (                  ) 
+//      );
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//     #(
+//        .c_cdc_type      (1             ),   
+//        .c_flop_input    (1             ),  
+//        .c_reset_state   (0             ),  
+//        .c_single_bit    (1             ),  
+//        .c_vector_width  (2             ),  
+//        .c_mtbf_stages   (3              )
+//      )link_reset_ila_cdc_sync_exdes 
+//      (
+//        .prmry_aclk      (init_clk_i        ),
+//        .prmry_rst_n     (1'b1              ),
+//        .prmry_in        (link_reset_i      ),
+//        .prmry_vect_in   (2'd0              ),
+//        .scndry_aclk     (user_clk_i        ),
+//        .scndry_rst_n    (1'b1              ),
+//        .prmry_ack       (                  ),
+//        .scndry_out      (link_reset_ila    ),
+//        .scndry_vect_out (                  ) 
+//      );
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//     #(
+//        .c_cdc_type      (1             ),   
+//        .c_flop_input    (1             ),  
+//        .c_reset_state   (0             ),  
+//        .c_single_bit    (1             ),  
+//        .c_vector_width  (2             ),  
+//        .c_mtbf_stages   (3              )
+//      )pll_not_locked_ila_cdc_sync_exdes 
+//      (
+//        .prmry_aclk      (init_clk_i        ),
+//        .prmry_rst_n     (1'b1              ),
+//        .prmry_in        (pll_not_locked_i  ),
+//        .prmry_vect_in   (2'd0              ),
+//        .scndry_aclk     (user_clk_i        ),
+//        .scndry_rst_n    (1'b1              ),
+//        .prmry_ack       (                  ),
+//        .scndry_out      (pll_not_locked_ila),
+//        .scndry_vect_out (                  ) 
+//      );
+// 
+//  aurora_8b10b_zcu_cdc_sync_exdes
+//     #(
+//        .c_cdc_type      (1             ),   
+//        .c_flop_input    (1             ),  
+//        .c_reset_state   (0             ),  
+//        .c_single_bit    (1             ),  
+//        .c_vector_width  (2             ),  
+//        .c_mtbf_stages   (3              )
+//      )tx_lock_i_ila_cdc_sync_exdes 
+//      (
+//        .prmry_aclk      (init_clk_i        ),
+//        .prmry_rst_n     (1'b1              ),
+//        .prmry_in        (tx_lock_i_i       ),
+//        .prmry_vect_in   (2'd0              ),
+//        .scndry_aclk     (user_clk_i        ),
+//        .scndry_rst_n    (1'b1              ),
+//        .prmry_ack       (                  ),
+//        .scndry_out      (tx_lock_i_ila     ),
+//        .scndry_vect_out (                  ) 
+//      );
+//      
+//ila_8series i_ila (
+//  .clk(user_clk_i), // input CLK
+//  .probe0({lane_up_i_i_r,channel_up_r,pll_not_locked_ila,tx_lock_i_ila,hard_err_i,soft_err_i,1'b0,tx_resetdone_ila,rx_resetdone_i,link_reset_ila,14'd0,err_count_i,rx_d_i[0:15],tx_d_i[0:15]}) // input [63 : 0] PROBE0
+//);
+//
+//end //end USE_CHIPSCOPE=1 generate section
+//else
+//begin : no_chipscope1
+//                                                                                                                                                                      
+//    // Shared VIO Inputs
+//        assign  sync_in_i         =  64'h0;
+//
+//end
+//
+// if (USE_CHIPSCOPE==1)
+// begin : chipscope2
+//     // Shared VIO Outputs
+// assign  reset_i =   RESET | sysreset_i;
+// assign  gtreset_vio_o =   GT_RESET_IN | gtreset_vio_i;
+// assign  loopback_vio_o =   3'b000 | loopback_vio_i;
+// end //end USE_CHIPSCOPE=1 block
+// else
+// begin: no_chipscope2
+// assign  reset_i =   RESET;
+// assign  gtreset_vio_o =   GT_RESET_IN;
+// assign  loopback_vio_o =   3'b000;
+// end //end USE_CHIPSCOPE=0 block
+//
+//endgenerate //End generate for USE_CHIPSCOPE
 
 
 endmodule
- 
+// 

@@ -94,8 +94,8 @@ wire               SYSTEM_RESET;
 //*********************************Main Body of Code**********************************
 
 //Reset sync from INIT_CLK to USER_CLK
-      aurora_8b10b_zcu_cdc_sync_exdes
-        #(
+      aurora_8b10b_zcu_cdc_sync_exdes #  // Due to connectal parsing, # should be placed here, not next line
+         (
            .c_cdc_type      (1             ),   
            .c_flop_input    (1             ),  
            .c_reset_state   (0             ),  
