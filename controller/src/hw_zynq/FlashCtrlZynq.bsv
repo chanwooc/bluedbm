@@ -6,6 +6,7 @@ import GetPut::*;
 import ClientServer::*;
 import Vector::*;
 import Clocks::*;
+import Leds::*;
 
 //import ConnectalMemory::*;
 import MemTypes::*;
@@ -35,6 +36,7 @@ typedef TMul#(2, TAdd#(128, TLog#(NumTags))) SerInSz;
 interface FCZynqDebug;
 	method Tuple2#(DataIfc, PacketType) debugRecPacket();
 	method Tuple4#(Bit#(32), Bit#(32), Bit#(32), Bit#(32)) getDebugCnts;
+	method Bit#(LedsWidth) getAuroraStatus; // Chanwoo
 endinterface
 
 interface FlashCtrlZynqIfc;
@@ -219,6 +221,14 @@ module mkFlashCtrlZynq#(
 			return debugRecPacketV;
 		endmethod
 		method Tuple4#(Bit#(32), Bit#(32), Bit#(32), Bit#(32)) getDebugCnts = auroraIntra.getDebugCnts;
+		method Bit#(LedsWidth) getAuroraStatus; //Chanwoo
+			Bit#(LedsWidth) ret = 0;
+			ret[0] = auroraIntra.channel_up;
+			ret[4:1] = auroraIntra.lane_up;
+			ret[5] = auroraIntra.hard_err;
+			ret[6] = auroraIntra.soft_err;
+			return ret;
+		endmethod
 	endinterface
 
 	interface Aurora_Pins aurora = auroraIntra.aurora;
