@@ -87,7 +87,7 @@ interface AuroraControllerIfc#(numeric type width);
 	interface Reset aurora_rst_n;
 		
 	method Bit#(1) channel_up;
-	method Bit#(1) lane_up;
+	method Bit#(4) lane_up;
 	method Bit#(1) hard_err;
 	method Bit#(1) soft_err;
 	method Bit#(8) data_err_count;
@@ -120,18 +120,39 @@ endinterface
 (* synthesize *)
 module mkGtxClockImport (GtxClockImportIfc);
 `ifndef BSIM
-	B2C i_gtx_clk_p <- mkB2C();
-	B2C i_gtx_clk_n <- mkB2C();
+	//B2C i_gtx_clk_p <- mkB2C();
+	//B2C i_gtx_clk_n <- mkB2C();
+
+	// To avoid errors in synthesis (ZCU102, Vivado 2016.4 <= )
+	B2C1 i_gtx_clk_p <- mkB2C1();
+	B2C1 i_gtx_clk_n <- mkB2C1();
+	Clock clk <- exposeCurrentClock;
+//	let i_gtx_clk_p_ibuf <- mkIBUF(defaultValue);
+//	let i_gtx_clk_n_ibuf <- mkIBUF(defaultValue);
+
+//	(* fire_when_enabled, no_implicit_conditions *)
+//	rule ibuf_to_b2c_p;
+//		i_gtx_clk_p.inputclock(i_gtx_clk_p_ibuf);
+//	endrule
+//	(* fire_when_enabled, no_implicit_conditions *)
+//	rule ibuf_to_b2c_n;
+//		i_gtx_clk_n.inputclock(i_gtx_clk_n_ibuf);
+//	endrule
 
 	interface Aurora_Clock_Pins aurora_clk;
 	method Action gtx_clk_p(Bit#(1) v);
 		i_gtx_clk_p.inputclock(v);
+		//i_gtx_clk_p_ibuf <= v;
 	endmethod
 	method Action gtx_clk_n(Bit#(1) v);
 		i_gtx_clk_n.inputclock(v);
+		//i_gtx_clk_n_ibuf <= v;
 	endmethod
-	interface Clock gtx_clk_p_deleteme_unused_clock = i_gtx_clk_p.c; // These clocks are deleted from the netlist by the synth.tcl script
-	interface Clock gtx_clk_n_deleteme_unused_clock = i_gtx_clk_n.c;
+
+	interface Clock gtx_clk_p_deleteme_unused_clock = clk;
+	interface Clock gtx_clk_n_deleteme_unused_clock = clk;
+	//interface Clock gtx_clk_p_deleteme_unused_clock = i_gtx_clk_p.c; // These clocks are deleted from the netlist by the synth.tcl script
+	//interface Clock gtx_clk_n_deleteme_unused_clock = i_gtx_clk_n.c;
 	endinterface
 	//interface Clock gtx_clk = gtx_clk_i;
 	interface Clock gtx_clk_p_ifc = i_gtx_clk_p.c;
