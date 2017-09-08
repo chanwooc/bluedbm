@@ -20,7 +20,7 @@ BSVFILES = Main.bsv \
 	../../controller/src/model_zynq/FlashCtrlModel.bsv \
 	../../controller/src/hw_zynq/FlashCtrlZynq.bsv
 
-CPPFILES=main_eraseall.cpp
+CPPFILES=main.cpp
 
 CONNECTALFLAGS += -D DataBusWidth=64
 CONNECTALFLAGS += -D NumReadClients=$(NUMBER_OF_ENGINES) -D NumWriteClients=$(NUMBER_OF_ENGINES)

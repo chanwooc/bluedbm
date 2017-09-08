@@ -190,12 +190,13 @@ module mkAuroraImport_8b10b_zynq#(Clock gtx_clk_in, Clock init_clk, Reset init_r
 	output_reset aurora_rst(USER_RST_N) clocked_by (aurora_clk);
 
 	input_clock (GTX_CLK) = gtx_clk_in;
+	input_clock clk () <- exposeCurrentClock;
 
 	interface Aurora_Pins aurora;
-		method rxn_in(RXN) enable((*inhigh*) rx_n_en) reset_by(no_reset) clocked_by(gtx_clk_in);
-		method rxp_in(RXP) enable((*inhigh*) rx_p_en) reset_by(no_reset) clocked_by(gtx_clk_in);
-		method TXN txn_out() reset_by(no_reset) clocked_by(gtx_clk_in); 
-		method TXP txp_out() reset_by(no_reset) clocked_by(gtx_clk_in);
+		method rxn_in(RXN) enable((*inhigh*) rx_n_en) reset_by(no_reset) clocked_by(clk); //clocked_by(gtx_clk_in);
+		method rxp_in(RXP) enable((*inhigh*) rx_p_en) reset_by(no_reset) clocked_by(clk); //clocked_by(gtx_clk_in);
+		method TXN txn_out() reset_by(no_reset); // clocked_by(gtx_clk_in); 
+		method TXP txp_out() reset_by(no_reset); // clocked_by(gtx_clk_in);
 	endinterface
 
 	interface AuroraControllerIfc user;

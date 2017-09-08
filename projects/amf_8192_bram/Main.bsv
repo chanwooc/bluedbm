@@ -457,7 +457,9 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	//--------------------------------------------
 
 	//Handle acks from controller
-	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
+//	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
+	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkSizedFIFO(valueOf(NumTags));
+
 	rule handleControllerAck;
 		let ackStatus <- flashCtrl.user.ackStatus();
 		ackQ.enq(ackStatus);
