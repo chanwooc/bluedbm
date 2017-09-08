@@ -38,6 +38,7 @@ import MemTypes::*;
 import MemReadEngine::*;
 import MemWriteEngine::*;
 import Pipe::*;
+import Leds::*;
 
 import Clocks :: *;
 import Xilinx       :: *;
@@ -56,26 +57,18 @@ import ControllerTypes::*;
 import FlashCtrlZynq::*;
 import FlashCtrlModel::*;
 
-import AFTL::*;
-import BRAM_Wrapper::*;
 import Top_Pins::*;
 
 //import MainTypes::*;
-typedef 8 NUM_FLASH_DMA_PORTS;
-typedef 9 NUM_ENG_PORTS;
+typedef 8 NUM_ENG_PORTS;
 
 interface FlashRequest;
-	// memory offset
-	method Action readPage(Bit#(32) tag, Bit#(32) lpa, Bit#(32) offset);
-	method Action writePage(Bit#(32) tag, Bit#(32) lpa, Bit#(32) offset);
-	method Action eraseBlock(Bit#(32) tag, Bit#(32) lpa);
+	method Action readPage(Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) page, Bit#(32) tag, Bit#(32) offset);
+	method Action writePage(Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) page, Bit#(32) tag, Bit#(32) offset);
+	method Action eraseBlock(Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) tag);
 
 	method Action setDmaReadRef(Bit#(32) sgId);
 	method Action setDmaWriteRef(Bit#(32) sgId);
-	method Action setDmaMapRef(Bit#(32) sgId);
-	
-	method Action downloadMap(); // FPGA to Host (DMA W)
-	method Action uploadMap();   // Host to FPGA (DMA R)
 
 	method Action start(Bit#(32) dummy);
 	method Action debugDumpReq(Bit#(32) dummy);
@@ -83,13 +76,9 @@ interface FlashRequest;
 endinterface
 
 interface FlashIndication;
-	method Action readDone(Bit#(32) tag, Bit#(32) status);
-	method Action writeDone(Bit#(32) tag, Bit#(32) status);
+	method Action readDone(Bit#(32) tag);
+	method Action writeDone(Bit#(32) tag);
 	method Action eraseDone(Bit#(32) tag, Bit#(32) status);
-
-	method Action uploadDone;
-	method Action downloadDone;
-
 	method Action debugDumpResp(Bit#(32) debug0, Bit#(32) debug1, Bit#(32) debug2, Bit#(32) debug3, Bit#(32) debug4, Bit#(32) debug5);
 endinterface
 
@@ -107,9 +96,10 @@ Integer wordsPerFlashPage = pageSizeUser/wordBytes; // 8224/16 = 514
 Integer wordsPer8192Page  = pageSize8192/wordBytes; // 8192/16 = 512
 Integer realBurstsPerPage = pageSize8192/dmaBurstBytes; // 64
 
-//Integer dmaAllocPageSizeLog = 14; //typically portal alloc page size is 16KB; MUST MATCH SW
 Integer dmaAllocPageSizeLog = 13; //typically portal alloc page size is 8KB; MUST MATCH SW
 Integer dmaLength = realBurstsPerPage * dmaBurstBytes; // 64 * 128 = 8192
+//Integer dmaAllocPageSizeLog = 14; //typically portal alloc page size is 16KB; MUST MATCH SW
+//Integer dmaLength = dmaBurstsPerPage * dmaBurstBytes; // 65 * 128 = 8320
 
 interface MainIfc;
 	interface FlashRequest request;
@@ -125,9 +115,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Reg#(Bool) started <- mkReg(False);
 	Reg#(Bit#(64)) cycleCnt <- mkReg(0);
 
-	FIFO#(FlashCmd) flashCmdQ <- mkSizedFIFO(valueOf(NumTags)/8);
-	FIFO#(FTLCmd) ftlCmdQ <- mkSizedFIFO(valueOf(NumTags));
-
+	FIFO#(FlashCmd) flashCmdQ <- mkSizedFIFO(valueOf(NumTags));
 	Vector#(NumTags, Reg#(BusT)) tag2busTable <- replicateM(mkRegU());
 
 	// Offset - pointer
@@ -144,36 +132,6 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlZynq(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
 	`endif
 
-
-	//--------------------------------------------
-	// AFTL & BRAM
-	//--------------------------------------------
-	BRAM_Wrapper1 bram_ctrl <- mkBRAM_Wrapper1;
-	AFTLIfc aFTL <- mkAFTL(bram_ctrl);
-
-	rule driveFTLCmd (started);
-		let cmd = ftlCmdQ.first;
-		ftlCmdQ.deq;
-
-		aFTL.translate(cmd);
-	endrule
-
-	rule driveFTLSuccessResp;
-		let cmd <- aFTL.getSuccess; //FlashCmd
-		flashCmdQ.enq(cmd);
-	endrule
-
-	rule driveFTLFailureResp;
-		let cmd <- aFTL.getFailure; //FTLCmd
-
-		case (cmd.op)
-			READ_PAGE:  indication.readDone(zeroExtend(cmd.tag), 1);
-			WRITE_PAGE: indication.writeDone(zeroExtend(cmd.tag), 1);
-			ERASE_BLOCK:indication.eraseDone(zeroExtend(cmd.tag), 1);
-		endcase
-	endrule
-
-
 	//--------------------------------------------
 	// DMA Module Instantiation
 	//--------------------------------------------
@@ -181,18 +139,24 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
 
 	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_ENG_PORTS,NumReadClients))) rengine, Integer idx ) ;
-		let numEngineServer = valueOf(NumReadClients);
-		let idxEngine = idx % numEngineServer;
-		let idxServer = idx / numEngineServer;
+		let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumReadClients));
+		let idxEngine = idx / numEngineServer;
+		let idxServer = idx % numEngineServer;
+
+		//let idxEngine = idx % valueOf(NumReadClients);
+		//let idxServer = idx / valueOf(NumReadClients);
 
 		return rengine[idxEngine].readServers[idxServer];
 		//return rengine[idx].readServers[0];
 	endfunction
 	
 	function MemWriteEngineServer#(DataBusWidth) getWEServer( Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) wengine, Integer idx ) ;
-		let numEngineServer = valueOf(NumWriteClients);
-		let idxEngine = idx % numEngineServer;
-		let idxServer = idx / numEngineServer;
+		//let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumWriteClients));
+		//let idxEngine = idx / numEngineServer;
+		//let idxServer = idx % numEngineServer;
+
+		let idxEngine = idx % valueOf(NumWriteClients);
+		let idxServer = idx / valueOf(NumWriteClients);
 
 		return wengine[idxEngine].writeServers[idxServer];
 		//return wengine[idx].writeServers[0];
@@ -203,6 +167,9 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		return (off<< dmaAllocPageSizeLog);
 	endfunction
 
+	rule incCycle;
+		cycleCnt <= cycleCnt + 1;
+	endrule
 
 	rule driveFlashCmd; // (started);
 		let cmd = flashCmdQ.first;
@@ -226,18 +193,16 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Reg#(Bit#(32)) dmaWriteSgid <- mkReg(0);
 
 	FIFO#(Tuple2#(Bit#(WordSz), TagT)) dataFlash2DmaQ <- mkFIFO();
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBuf <- replicateM(mkSizedBRAMFIFO(dmaBurstWords*2));
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBufOut <- replicateM(mkFIFO());
+	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBuf <- replicateM(mkSizedFIFO(dmaBurstWords*2)); // mkSizedBRAMFIFO
+	Vector#(NUM_ENG_PORTS, FIFO#(Tuple2#(Bit#(WordSz), TagT))) dmaWriteBufOut <- replicateM(mkFIFO());
 
-	//Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));
-	//Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(16))) dmaWBurstPerPageCnts <- replicateM(mkReg(0));
-	Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(32))) wordPerPageCnts <- replicateM(mkReg(0));
+	//Vector#(NUM_ENG_PORTS, Reg#(Bit#(16))) dmaWBurstCnts <- replicateM(mkReg(0));
+	//Vector#(NUM_ENG_PORTS, Reg#(Bit#(16))) dmaWBurstPerPageCnts <- replicateM(mkReg(0));
+	Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) wordPerPageCnts <- replicateM(mkReg(0));
 
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWrReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags)/8)); //TODO make bigger?
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWriteReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)/8));//TODO make bigger?
-	Vector#(NUM_FLASH_DMA_PORTS, FIFOF#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFOF);
-
-//	Vector#(NUM_FLASH_DMA_PORTS, Reg#(TagT)) currTags <- replicateM(mkReg(0));
+	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaWrReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO make bigger?
+	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaWriteReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));//TODO make bigger?
+	Vector#(NUM_ENG_PORTS, FIFOF#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFOF);
 
 	rule doEnqReadFromFlash;
 		if (delayReg==0) begin
@@ -253,17 +218,21 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		end
 	endrule
 
+	Reg#(Bit#(3)) dmaWBus <- mkReg(0);
+
 	rule doDistributeReadFromFlash;
 		let taggedRdata = dataFlash2DmaQ.first;
 		dataFlash2DmaQ.deq;
 		let tag = tpl_2(taggedRdata);
 		let data = tpl_1(taggedRdata);
 		BusT bus = tag2busTable[tag];
+		//let bus = dmaWBus;
+		//dmaWBus <= dmaWBus + 1;
 		dmaWriteBuf[bus].enq(taggedRdata);
-		//$display("@%d Main.bsv: rdata tag=%d, bus=%d, data[%d]=%x", cycleCnt, tag, bus, dmaWBurstCnts[bus], data);
+		//$display("@%d Main.bsv: rdata tag=%d, bus=%d, data[%d,%d]=%x", cycleCnt, tag, bus,dmaWBurstPerPageCnts[bus], dmaWBurstCnts[bus], data);
 	endrule
 
-	for (Integer b=0; b<valueOf(NUM_FLASH_DMA_PORTS); b=b+1) begin
+	for (Integer b=0; b<valueOf(NUM_ENG_PORTS); b=b+1) begin
 		//Reg#(Bit#(16)) padCnt <- mkReg(0);
 
 		//dmaWBurstCnts: counts # of words(128bit, 16Byte) in a dma burst (128Byte): 0~7
@@ -324,15 +293,10 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		Reg#(Bit#(1)) phase <- mkReg(0);
 		rule sendDmaWriteData;
 			let taggedRdata = dmaWriteBufOut[b].first;
-			Bit#(DataBusWidth) data = (phase==0) ? truncateLSB(tpl_1(taggedRdata)) : truncate(tpl_1(taggedRdata));
-			
-			if (phase==1) begin
-				dmaWriteBufOut[b].deq;
-			end
-			phase <= phase + 1;
+			dmaWriteBufOut[b].deq;
 
 			let weS = getWEServer(we,b);
-			weS.data.enq(data);
+			weS.data.enq(tpl_1(taggedRdata));
 		endrule
 
 		//dma response.get done; when enough has accumulated, send ack to sw
@@ -348,20 +312,23 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 //		rule collectReadDone;
 //			dmaWriteDoneQs[b].deq;
 //			let tag = dmaWriteDoneQs[b].first;
-//			indication.readDone(zeroExtend(tag), 0);
+//			indication.readDone(zeroExtend(tag));
 //		endrule
+
 	end //for each bus
 
-	Vector#(NUM_FLASH_DMA_PORTS, PipeOut#(TagT)) dmaWriteDonePipes = map(toPipeOut, dmaWriteDoneQs);
-	FunnelPipe#(1, NUM_FLASH_DMA_PORTS, TagT, 2) readAckFunnel <- mkFunnelPipesPipelined(dmaWriteDonePipes);
+	Vector#(NUM_ENG_PORTS, PipeOut#(TagT)) dmaWriteDonePipes = map(toPipeOut, dmaWriteDoneQs);
+	FunnelPipe#(1, NUM_ENG_PORTS, TagT, 2) readAckFunnel <- mkFunnelPipesPipelined(dmaWriteDonePipes);
 
 	FIFO#(TagT) readAckQ <- mkSizedFIFO(valueOf(NumTags));
 	mkConnection(toGet(readAckFunnel[0]), toPut(readAckQ));
 
 	rule sendReadDone;
 		let tag <- toGet(readAckQ).get();
-		indication.readDone(zeroExtend(tag), 0);
+		indication.readDone(zeroExtend(tag));
 	endrule
+
+
 
 	//--------------------------------------------
 	// Writes to Flash (DMA Reads)
@@ -369,16 +336,20 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Reg#(Bit#(32)) dmaReadSgid <- mkReg(0);
 
 	FIFO#(Tuple2#(TagT, BusT)) wrToDmaReqQ <- mkFIFO();
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaRdReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO sz
-	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaReadReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));
-	Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(32))) dmaReadBurstCount <- replicateM(mkReg(0));
-	//Vector#(NUM_FLASH_DMA_PORTS, Reg#(Bit#(32))) dmaRdReqCnts <- replicateM(mkReg(0));
+	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaRdReq2RespQ <- replicateM(mkSizedFIFO(valueOf(NumTags))); //TODO sz
+	Vector#(NUM_ENG_PORTS, FIFO#(TagT)) dmaReadReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)));
+	Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) dmaReadBurstCount <- replicateM(mkReg(0));
+	//Vector#(NUM_ENG_PORTS, Reg#(Bit#(32))) dmaRdReqCnts <- replicateM(mkReg(0));
 
 	//Handle write data requests from controller
+
+	Reg#(BusT) dmaRBus <- mkReg(0);
 	rule handleWriteDataRequestFromFlash;
 		TagT tag <- flashCtrl.user.writeDataReq();
 		//check which bus it's from
 		let bus = tag2busTable[tag];
+		//let bus = dmaRBus;
+		//dmaRBus <= dmaRBus + 1;
 		wrToDmaReqQ.enq(tuple2(tag, bus));
 	endrule
 
@@ -392,7 +363,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		//dmaReaders[bus].startRead(tag, fromInteger(pageWords));
 	endrule
 
-	for (Integer b=0; b<valueOf(NUM_FLASH_DMA_PORTS); b=b+1) begin
+	for (Integer b=0; b<valueOf(NUM_ENG_PORTS); b=b+1) begin
 		rule initDmaRead;
 			let tag = dmaReadReqQ[b].first;
 			let offset = dmaReadOffset[tag];
@@ -410,21 +381,11 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 			dmaReadReqQ[b].deq;
 		endrule
 
-		//forward data: 64->128 (Zynq)
-		Reg#(Bit#(1)) phaseDmaR <- mkReg(0);
-		Reg#(Bit#(WordSz)) dataTmp <- mkReg(0);
 		FIFO#(Bit#(WordSz)) rdDataPipe <- mkFIFO;
 		rule aggrDmaRdData;
 			let reS = getREServer(re,b);
 			let d <- toGet(reS.data).get;
-			phaseDmaR <= phaseDmaR+1;
-			if(phaseDmaR==0) begin
-				dataTmp <= zeroExtend(d.data);
-			end
-			else begin
-				Bit#(WordSz) dataAggr = (dataTmp<<valueOf(DataBusWidth)) | zeroExtend(d.data);
-				rdDataPipe.enq(dataAggr);
-			end
+			rdDataPipe.enq(d.data);
 		endrule
 
 		FIFO#(Tuple2#(Bit#(128), TagT)) writeWordPipe <- mkFIFO();
@@ -468,9 +429,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	//--------------------------------------------
 
 	//Handle acks from controller
-//	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
-	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkSizedFIFO(valueOf(NumTags));
-
+	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
 	rule handleControllerAck;
 		let ackStatus <- flashCtrl.user.ackStatus();
 		ackQ.enq(ackStatus);
@@ -481,164 +440,12 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		TagT tag = tpl_1(ackQ.first);
 		StatusT st = tpl_2(ackQ.first);
 		case (st)
-			WRITE_DONE: indication.writeDone(zeroExtend(tag), 0);
+			WRITE_DONE: indication.writeDone(zeroExtend(tag));
 			ERASE_DONE: indication.eraseDone(zeroExtend(tag), 0);
 			ERASE_ERROR: indication.eraseDone(zeroExtend(tag), 1);
 		endcase
 	endrule
 
-	//--------------------------------------------
-	// AFTL Map & Block Mgr Table Up/Download
-	//--------------------------------------------
-
-	Reg#(Bit#(32)) dmaMapSgid <- mkReg(0);
-	FIFO#(MapLockMode) mapReq <- mkFIFO;
-//	FIFO#(Bool) downloadReq <- mkSizedFIFO(4);
-//	FIFO#(Bool) uploadReq <- mkSizedFIFO(4);
-
-	rule issueMapReq (!bram_ctrl.isLocked);
-		let d = mapReq.first;
-		mapReq.deq;
-		bram_ctrl.lockPortB(d);
-
-//		if (d == UPLOAD) uploadReq.enq(True);
-//		else downloadReq.enq(True);
-	endrule
-
-	// DMA Read (Host->FPGA, Upload)
-	FIFOF#(Bool) ftlReadReq2Resp <- mkFIFOF;
-	FIFOF#(Bool) ftlReadResp <- mkFIFOF;
-
-	rule initFTLRead (bram_ctrl.lockMode == UPLOAD && !ftlReadReq2Resp.notEmpty && !ftlReadResp.notEmpty);
-	// from Host to FPGA (Upload)
-		let dmaCmd = MemengineCmd {
-							sglId: dmaMapSgid, 
-							base: 0,
-							len: 1024*1024, // 1MB 
-							burstLen: 128
-						};
-
-		let reS = getREServer(re, 8);
-		reS.request.put(dmaCmd);
-
-		$display("[AFTLBRAMTest.bsv] init dma read cmd issued");
-
-//		uploadReq.deq;
-		ftlReadReq2Resp.enq(True);
-	endrule
-
-	// Total 1MB
-	// Each burst beat 64bit = 8Byte 
-	// --> total 128*1024 = 2^17 beats
-	Integer dmaMapBeats = 128*1024;
-	Reg#(Bit#(20)) ftlReadBeatCnt <- mkReg(0);
-
-	rule incCycle;
-		cycleCnt <= cycleCnt + 1;
-	endrule
-
-	rule pipeFTLRdData (bram_ctrl.lockMode == UPLOAD && ftlReadReq2Resp.notEmpty && !ftlReadResp.notEmpty );
-		let reS = getREServer(re, 8);
-		let d <- toGet(reS.data).get; //Each beat is 64 bit = 8 Byte wide
-		$display("[tick%d] dmaGet %d", cycleCnt, ftlReadBeatCnt);
-
-		// BRAM: 64 Byte-word addressing (14 bit address -> 64 Byte-word)
-		// 8 Beats per each address
-		// ftlReadBeatCnt >> 3     : 14bit address
-		// ftlReadBeatCnt[2:0] << 6: Data-shift unit = 64 bit = 2^6 bit
-		// ftlReadBeatCnt[2:0] << 3: Mask-shift unit = 8 Byte = 2^3 Byte
-		bram_ctrl.writeB( truncate  ( ftlReadBeatCnt >> 3 ),
-						  zeroExtend( d.data ) << {ftlReadBeatCnt[2:0], 6'b0} ,
-						  zeroExtend( 64'b11111111 << { ftlReadBeatCnt[2:0], 3'b0}) );
-
-		if (ftlReadBeatCnt == fromInteger(dmaMapBeats - 1)) begin
-			ftlReadBeatCnt <= 0;
-			ftlReadReq2Resp.deq;
-			ftlReadResp.enq(True);
-		end else begin
-			ftlReadBeatCnt <= ftlReadBeatCnt+1;
-		end
-	endrule
-
-	rule ftlRdDone (bram_ctrl.lockMode == UPLOAD && !ftlReadReq2Resp.notEmpty && ftlReadResp.notEmpty); // Upload done
-		ftlReadResp.deq;
-		indication.uploadDone;
-		bram_ctrl.unlockPortB;
-	endrule
-
-	// DMA Write
-	FIFOF#(Bool) mapBramReq <- mkFIFOF;//mkSizedFIFOF(10);
-	FIFOF#(Bool) ftlWriteReq2Resp <- mkFIFOF;//mkSizedFIFOF(10);
-
-	// Total 1MB, each word: 512bit=64Byte -> total 14bit address
-	// Total 1MB, Each burst beat 64bit = 8Byte -> total 128*1024 beats
-	Integer mapDownloadReqs = 16*1024; // 2^14
-	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
-	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
-
-	rule initDownload (bram_ctrl.lockMode == DOWNLOAD && !mapBramReq.notEmpty && !ftlWriteReq2Resp.notEmpty);
-//		downloadReq.deq;
-		mapBramReq.enq(True);
-		ftlWriteReq2Resp.enq(True);
-
-		let dmaCmd = MemengineCmd {
-							sglId: dmaMapSgid, 
-							base: 0,
-							len: 1024*1024, // 1MB 
-							burstLen: 128
-						};
-
-		let weS = getWEServer(we, 8);
-		weS.request.put(dmaCmd);
-
-		$display("[AFTLBRAMTest.bsv] init dma write cmd issued");
-	endrule
-
-	rule reqMapData (bram_ctrl.lockMode == DOWNLOAD && mapBramReq.notEmpty);
-		$display("[AFTLBRAMTest.bsv] %dth req", mapDownloadReqCnt);
-		bram_ctrl.readReqB( truncate( mapDownloadReqCnt ) );
-
-		if (mapDownloadReqCnt == fromInteger(mapDownloadReqs - 1)) begin
-			mapDownloadReqCnt <= 0;
-			mapBramReq.deq;
-		end else begin
-			mapDownloadReqCnt <= mapDownloadReqCnt+1;
-		end
-	endrule
-
-	FIFO#(Bit#(512)) dmaWrDataBuf <- mkFIFO;
-
-	rule pipeFTLWrData1 (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
-		let d <- bram_ctrl.readB;
-		dmaWrDataBuf.enq(d);
-	endrule
-
-	Reg#(Bit#(3)) ftlWrPhase <- mkReg(0);
-
-	rule pipeFTLWrData2 (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
-		let buffered_data = dmaWrDataBuf.first; // 512bit
-
-		Bit#(DataBusWidth) data = truncate( buffered_data >> { ftlWrPhase, 6'b0 } );
-
-		let weS = getWEServer(we, 8);
-		weS.data.enq(data);
-
-		if (ftlWrPhase == 7) begin
-			dmaWrDataBuf.deq;
-		end
-
-		ftlWrPhase <= ftlWrPhase+1;
-	endrule
-
-
-	rule ftlWrDone (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
-		let weS = getWEServer(we, 8);
-		let dummy <- weS.done.get;
-		ftlWriteReq2Resp.deq;
-
-		indication.downloadDone;
-		bram_ctrl.unlockPortB;
-	endrule
 
 	//--------------------------------------------
 	// Debug
@@ -667,37 +474,54 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	end
 
 	interface FlashRequest request;
-		method Action readPage(Bit#(32) tag, Bit#(32) lpa, Bit#(32) offset);
-			FTLCmd fcmd = FTLCmd {
+		method Action readPage(Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) page, Bit#(32) tag, Bit#(32) offset);
+			FlashCmd fcmd = FlashCmd{
 				tag: truncate(tag),
-				op:  READ_PAGE,
-				lpa: lpa
-			};
+				op: READ_PAGE,
+				bus: truncate(bus),
+				chip: truncate(chip),
+				block: truncate(block),
+				page: truncate(page)
+				};
 
-			ftlCmdQ.enq(fcmd);
+			flashCmdQ.enq(fcmd);
 			dmaWriteOffset[tag] <= offset;
 		endmethod
-
-		method Action writePage(Bit#(32) tag, Bit#(32) lpa, Bit#(32) offset);
-			FTLCmd fcmd = FTLCmd {
+		
+		method Action writePage(Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) page, Bit#(32) tag, Bit#(32) offset);
+			FlashCmd fcmd = FlashCmd{
 				tag: truncate(tag),
-				op:  WRITE_PAGE,
-				lpa: lpa
-			};
+				op: WRITE_PAGE,
+				bus: truncate(bus),
+				chip: truncate(chip),
+				block: truncate(block),
+				page: truncate(page)
+				};
 
-			ftlCmdQ.enq(fcmd);
+			flashCmdQ.enq(fcmd);
 			dmaReadOffset[tag] <= offset;
 		endmethod
 
-		method Action eraseBlock(Bit#(32) tag, Bit#(32) lpa);
-			FTLCmd fcmd = FTLCmd {
+		method Action eraseBlock(Bit#(32) bus, Bit#(32) chip, Bit#(32) block, Bit#(32) tag);
+			FlashCmd fcmd = FlashCmd{
 				tag: truncate(tag),
-				op:  ERASE_BLOCK,
-				lpa: lpa
-			};
+				op: ERASE_BLOCK,
+				bus: truncate(bus),
+				chip: truncate(chip),
+				block: truncate(block),
+				page: 0
+				};
 
-			ftlCmdQ.enq(fcmd);
+			flashCmdQ.enq(fcmd);
 		endmethod
+
+//		method Action addDmaReadRefs(Bit#(32) pointer, Bit#(32) offset, Bit#(32) tag);
+//			dmaReadRefs[tag] <= tuple2(pointer, offset);
+//		endmethod
+//
+//		method Action addDmaWriteRefs(Bit#(32) pointer, Bit#(32) offset, Bit#(32) tag);
+//			dmaWriteRefs[tag] <= tuple2(pointer, offset);
+//		endmethod
 
 		method Action setDmaReadRef(Bit#(32) sgId);
 			dmaReadSgid <= sgId;
@@ -705,18 +529,6 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 
 		method Action setDmaWriteRef(Bit#(32) sgId);
 			dmaWriteSgid <= sgId;
-		endmethod
-
-		method Action setDmaMapRef(Bit#(32) sgId);
-			dmaMapSgid <= sgId;
-		endmethod
-
-		method Action downloadMap(); // Read Map&Mgr from FPGA to Host (DMA Write)
-			mapReq.enq(DOWNLOAD);
-		endmethod
-
-		method Action uploadMap(); // Upload Map&Mgr from host to FPGA (DMA Read)
-			mapReq.enq(UPLOAD);
 		endmethod
 
 		method Action start(Bit#(32) dummy);
@@ -740,5 +552,8 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	interface Top_Pins pins;
 		interface aurora_fmc1 = flashCtrl.aurora;
 		interface aurora_clk_fmc1 = gtx_clk_fmc1.aurora_clk;
+		interface LEDS leds;
+			method Bit#(LedsWidth) leds = flashCtrl.debug.getAuroraStatus;
+		endinterface
 	endinterface
 endmodule

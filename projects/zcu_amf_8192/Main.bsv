@@ -38,6 +38,7 @@ import MemTypes::*;
 import MemReadEngine::*;
 import MemWriteEngine::*;
 import Pipe::*;
+import Leds::*;
 
 import Clocks :: *;
 import Xilinx       :: *;
@@ -237,7 +238,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) dmaWriteReqQ <- replicateM(mkSizedFIFO(valueOf(NumTags)/8));//TODO make bigger?
 	Vector#(NUM_FLASH_DMA_PORTS, FIFOF#(TagT)) dmaWriteDoneQs <- replicateM(mkFIFOF);
 
-//	Vector#(NUM_FLASH_DMA_PORTS, Reg#(TagT)) currTags <- replicateM(mkReg(0));
+//	Vector#(NUM_FLASH_DMA_PORTS, FIFO#(TagT)) readDoneQ <- replicateM(mkFIFO);
 
 	rule doEnqReadFromFlash;
 		if (delayReg==0) begin
@@ -324,15 +325,10 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		Reg#(Bit#(1)) phase <- mkReg(0);
 		rule sendDmaWriteData;
 			let taggedRdata = dmaWriteBufOut[b].first;
-			Bit#(DataBusWidth) data = (phase==0) ? truncateLSB(tpl_1(taggedRdata)) : truncate(tpl_1(taggedRdata));
-			
-			if (phase==1) begin
-				dmaWriteBufOut[b].deq;
-			end
-			phase <= phase + 1;
+			dmaWriteBufOut[b].deq;
 
 			let weS = getWEServer(we,b);
-			weS.data.enq(data);
+			weS.data.enq(tpl_1(taggedRdata));
 		endrule
 
 		//dma response.get done; when enough has accumulated, send ack to sw
@@ -410,21 +406,12 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 			dmaReadReqQ[b].deq;
 		endrule
 
-		//forward data: 64->128 (Zynq)
-		Reg#(Bit#(1)) phaseDmaR <- mkReg(0);
-		Reg#(Bit#(WordSz)) dataTmp <- mkReg(0);
 		FIFO#(Bit#(WordSz)) rdDataPipe <- mkFIFO;
+		//FIFO#(Bit#(WordSz)) rdDataPipe <- mkSizedBRAMFIFO(dmaBurstWords*8);
 		rule aggrDmaRdData;
 			let reS = getREServer(re,b);
 			let d <- toGet(reS.data).get;
-			phaseDmaR <= phaseDmaR+1;
-			if(phaseDmaR==0) begin
-				dataTmp <= zeroExtend(d.data);
-			end
-			else begin
-				Bit#(WordSz) dataAggr = (dataTmp<<valueOf(DataBusWidth)) | zeroExtend(d.data);
-				rdDataPipe.enq(dataAggr);
-			end
+			rdDataPipe.enq(d.data);
 		endrule
 
 		FIFO#(Tuple2#(Bit#(128), TagT)) writeWordPipe <- mkFIFO();
@@ -470,7 +457,6 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	//Handle acks from controller
 //	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkFIFO;
 	FIFO#(Tuple2#(TagT, StatusT)) ackQ <- mkSizedFIFO(valueOf(NumTags));
-
 	rule handleControllerAck;
 		let ackStatus <- flashCtrl.user.ackStatus();
 		ackQ.enq(ackStatus);
@@ -527,10 +513,16 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		ftlReadReq2Resp.enq(True);
 	endrule
 
+//	// Total 1MB
+//	// Each burst beat 64bit = 8Byte 
+//	// --> total 128*1024 = 2^17 beats
+//	Integer dmaMapBeats = 128*1024;
+//	Reg#(Bit#(20)) ftlReadBeatCnt <- mkReg(0);
+
 	// Total 1MB
-	// Each burst beat 64bit = 8Byte 
-	// --> total 128*1024 = 2^17 beats
-	Integer dmaMapBeats = 128*1024;
+	// Each burst beat 128bit = 16Byte 
+	// --> total 64*1024 = 2^16 beats
+	Integer dmaMapBeats = 64*1024;
 	Reg#(Bit#(20)) ftlReadBeatCnt <- mkReg(0);
 
 	rule incCycle;
@@ -542,14 +534,23 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		let d <- toGet(reS.data).get; //Each beat is 64 bit = 8 Byte wide
 		$display("[tick%d] dmaGet %d", cycleCnt, ftlReadBeatCnt);
 
+//		// BRAM: 64 Byte-word addressing (14 bit address -> 64 Byte-word)
+//		// 8 Beats per each address
+//		// ftlReadBeatCnt >> 3     : 14bit address
+//		// ftlReadBeatCnt[2:0] << 6: Data-shift unit = 64 bit = 2^6 bit
+//		// ftlReadBeatCnt[2:0] << 3: Mask-shift unit = 8 Byte = 2^3 Byte
+//		bram_ctrl.writeB( truncate  ( ftlReadBeatCnt >> 3 ),
+//						  zeroExtend( d.data ) << {ftlReadBeatCnt[2:0], 6'b0} ,
+//						  zeroExtend( 64'b11111111 << { ftlReadBeatCnt[2:0], 3'b0}) );
+
 		// BRAM: 64 Byte-word addressing (14 bit address -> 64 Byte-word)
-		// 8 Beats per each address
-		// ftlReadBeatCnt >> 3     : 14bit address
-		// ftlReadBeatCnt[2:0] << 6: Data-shift unit = 64 bit = 2^6 bit
-		// ftlReadBeatCnt[2:0] << 3: Mask-shift unit = 8 Byte = 2^3 Byte
-		bram_ctrl.writeB( truncate  ( ftlReadBeatCnt >> 3 ),
-						  zeroExtend( d.data ) << {ftlReadBeatCnt[2:0], 6'b0} ,
-						  zeroExtend( 64'b11111111 << { ftlReadBeatCnt[2:0], 3'b0}) );
+		// 4 Beats per each address (Beat is 128bit = 16bytes)
+		// ftlReadBeatCnt >> 2     : 14bit address
+		// ftlReadBeatCnt[1:0] << 7: Data-shift unit = 128 bit = 2^7 bit
+		// ftlReadBeatCnt[1:0] << 4: Mask-shift unit = 16 Byte = 2^4 Byte
+		bram_ctrl.writeB( truncate  ( ftlReadBeatCnt >> 2 ),
+						  zeroExtend( d.data ) << {ftlReadBeatCnt[1:0], 7'b0} ,
+						  zeroExtend( 64'b1111_1111_1111_1111 << { ftlReadBeatCnt[1:0], 4'b0}) );
 
 		if (ftlReadBeatCnt == fromInteger(dmaMapBeats - 1)) begin
 			ftlReadBeatCnt <= 0;
@@ -570,8 +571,14 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	FIFOF#(Bool) mapBramReq <- mkFIFOF;//mkSizedFIFOF(10);
 	FIFOF#(Bool) ftlWriteReq2Resp <- mkFIFOF;//mkSizedFIFOF(10);
 
+//	// Total 1MB, each word: 512bit=64Byte -> total 14bit address
+//	// Total 1MB, Each burst beat 64bit = 8Byte -> total 128*1024 beats
+//	Integer mapDownloadReqs = 16*1024; // 2^14
+//	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
+//	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
+
 	// Total 1MB, each word: 512bit=64Byte -> total 14bit address
-	// Total 1MB, Each burst beat 64bit = 8Byte -> total 128*1024 beats
+	// Total 1MB, Each burst beat 128bit = 16Byte -> total 64*1024 beats
 	Integer mapDownloadReqs = 16*1024; // 2^14
 	Reg#(Bit#(20)) mapDownloadReqCnt <- mkReg(0);
 	Reg#(Bit#(20)) dmaWriteBeatCnt <- mkReg(0);
@@ -613,17 +620,19 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 		dmaWrDataBuf.enq(d);
 	endrule
 
-	Reg#(Bit#(3)) ftlWrPhase <- mkReg(0);
+//	Reg#(Bit#(3)) ftlWrPhase <- mkReg(0);
+	Reg#(Bit#(2)) ftlWrPhase <- mkReg(0);
+
 
 	rule pipeFTLWrData2 (bram_ctrl.lockMode == DOWNLOAD && ftlWriteReq2Resp.notEmpty);
 		let buffered_data = dmaWrDataBuf.first; // 512bit
 
-		Bit#(DataBusWidth) data = truncate( buffered_data >> { ftlWrPhase, 6'b0 } );
+		Bit#(DataBusWidth) data = truncate( buffered_data >> { ftlWrPhase, 7'b0 } );
 
 		let weS = getWEServer(we, 8);
 		weS.data.enq(data);
 
-		if (ftlWrPhase == 7) begin
+		if (ftlWrPhase == 3) begin
 			dmaWrDataBuf.deq;
 		end
 
@@ -740,5 +749,8 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	interface Top_Pins pins;
 		interface aurora_fmc1 = flashCtrl.aurora;
 		interface aurora_clk_fmc1 = gtx_clk_fmc1.aurora_clk;
+		interface LEDS leds;
+			method Bit#(LedsWidth) leds = flashCtrl.debug.getAuroraStatus;
+		endinterface
 	endinterface
 endmodule

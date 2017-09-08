@@ -7,6 +7,8 @@ import DefaultValue :: *;
 import Xilinx :: *;
 import XilinxCells :: *;
 import ConnectalXilinxCells::*;
+import GTE4::*; //added
+
 `include "ConnectalProjectConfig.bsv"
 
 import AuroraCommon::*;
@@ -22,7 +24,7 @@ interface AuroraIfc;
 	interface Reset rst;
 
 	method Bit#(1) channel_up;
-	method Bit#(1) lane_up;
+	method Bit#(4) lane_up;
 	method Bit#(1) hard_err;
 	method Bit#(1) soft_err;
 	method Bit#(8) data_err_count;
@@ -32,26 +34,32 @@ interface AuroraIfc;
 endinterface
 
 (* synthesize *)
-module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock clk200) (AuroraIfc);
+module mkAuroraIntra#(Clock gtx_clk_p, Clock gtx_clk_n, Clock init_clk) (AuroraIfc);
 
 	Clock curClk <- exposeCurrentClock;
 	Reset curRst <- exposeCurrentReset;
 
 
 `ifndef BSIM
-	ClockDiv4Ifc auroraIntraClockDiv4 <- mkClockDiv4(clk200);
-	Clock clk50 = auroraIntraClockDiv4.slowClock;
+//	ClockDiv4Ifc auroraIntraClockDiv4 <- mkClockDiv4(clk200);
+//	Clock clk50 = auroraIntraClockDiv4.slowClock;
+//
+//	Reset rst50 <- mkAsyncReset(3, curRst, clk50); //reset should be min 6 user_clk(110MHz) cycles
+//
+//	//Clock fmc1_gtx_clk_i <- mkClockIBUFDS_GTE4(True, gtx_clk_p, gtx_clk_n);
+//
+//	MakeResetIfc rstgtxifc <- mkReset(8, True, clk50); //gtx_reset should be min 6 init_clk cycles
+//	Reset rstgtx = rstgtxifc.new_rst;
+//	//AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_zcu(fmc1_gtx_clk_i, clk50, rst50, rstgtx);
+//	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_zcu(gtx_clk_p, gtx_clk_n, clk50, rst50, rstgtx);
 
-	Reset rst50 <- mkAsyncReset(3, curRst, clk50); //reset should be min 6 user_clk(110MHz) cycles
-	Clock fmc1_gtx_clk_i <- mkClockIBUFDS_GTE2(
-`ifdef ClockDefaultParam
-						   defaultValue,
-`endif
-						   True, gtx_clk_p, gtx_clk_n);
+	Clock init_clk_i = init_clk;
 
-	MakeResetIfc rstgtxifc <- mkReset(8, True, clk50); //gtx_reset should be min 6 init_clk cycles
+	Reset rst50 <- mkAsyncReset(24, curRst, init_clk_i); //reset should be min 6 user_clk(110MHz) cycles
+
+	MakeResetIfc rstgtxifc <- mkReset(12, True, init_clk_i); //gtx_reset should be min 6 init_clk cycles
 	Reset rstgtx = rstgtxifc.new_rst;
-	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_zynq(fmc1_gtx_clk_i, clk50, rst50, rstgtx);
+	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_zcu(gtx_clk_p, gtx_clk_n, init_clk_i, rst50, rstgtx);
 `else
 	AuroraImportIfc#(4) auroraIntraImport <- mkAuroraImport_8b10b_bsim;
 `endif
@@ -153,8 +161,8 @@ module mkAuroraImport_8b10b_bsim (AuroraImportIfc#(4));
 		method Bit#(1) channel_up;
 			return laneUpR; 
 		endmethod
-		method Bit#(1) lane_up;
-			return laneUpR;
+		method Bit#(4) lane_up;
+			return {laneUpR, laneUpR, laneUpR, laneUpR};
 		endmethod
 		method Bit#(1) hard_err;
 			return 0;
@@ -176,27 +184,30 @@ module mkAuroraImport_8b10b_bsim (AuroraImportIfc#(4));
 	endinterface
 endmodule
 
-import "BVI" aurora_8b10b_zynq_exdes =
-module mkAuroraImport_8b10b_zynq#(Clock gtx_clk_in, Clock init_clk, Reset init_rst_n, Reset gt_rst_n) (AuroraImportIfc#(4));
+import "BVI" aurora_8b10b_zcu_exdes =
+//module mkAuroraImport_8b10b_zcu#(Clock gtx_clk_in, Clock init_clk, Reset init_rst_n, Reset gt_rst_n) (AuroraImportIfc#(4));
+module mkAuroraImport_8b10b_zcu#(Clock gtx_clk_p, Clock gtx_clk_n, Clock init_clk, Reset init_rst_n, Reset gt_rst_n) (AuroraImportIfc#(4));
 	default_clock no_clock;
 	default_reset no_reset;
 
-	input_clock init_clk_in (INIT_CLK_IN) = init_clk;
-	input_clock drp_clk_in  (DRP_CLK_IN)  = init_clk; 
+	input_clock (INIT_CLK_IN) = init_clk;
 	input_reset (RESET_N) = init_rst_n;
 	input_reset (GT_RESET_N) = gt_rst_n;
 
 	output_clock aurora_clk(USER_CLK);
 	output_reset aurora_rst(USER_RST_N) clocked_by (aurora_clk);
 
-	input_clock (GTX_CLK) = gtx_clk_in;
+	//input_clock (GT_REFCLK_IN) = gtx_clk_in;
+	input_clock (GT_REFCLK_P) = gtx_clk_p;
+	input_clock (GT_REFCLK_N) = gtx_clk_n;
+
 	input_clock clk () <- exposeCurrentClock;
 
 	interface Aurora_Pins aurora;
 		method rxn_in(RXN) enable((*inhigh*) rx_n_en) reset_by(no_reset) clocked_by(clk); //clocked_by(gtx_clk_in);
 		method rxp_in(RXP) enable((*inhigh*) rx_p_en) reset_by(no_reset) clocked_by(clk); //clocked_by(gtx_clk_in);
-		method TXN txn_out() reset_by(no_reset); // clocked_by(gtx_clk_in); 
-		method TXP txp_out() reset_by(no_reset); // clocked_by(gtx_clk_in);
+		method TXN txn_out() reset_by(no_reset); // clocked_by(gtx_clk_p); //clocked_by(gtx_clk_in); 
+		method TXP txp_out() reset_by(no_reset); // clocked_by(gtx_clk_p); //clocked_by(gtx_clk_in);
 	endinterface
 
 	interface AuroraControllerIfc user;
