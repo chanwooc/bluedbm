@@ -287,7 +287,7 @@ aurora_8b10b_zcu aurora_8b10b_zcu_i
        .gt3_drpdo                    (gt3_drpdo),
        .gt3_drpwe                     (gt3_drpwe),
 
-    .gt_powergood          (),
+    //.gt_powergood          (),
 
 
        .sys_reset_out                (sys_reset_out),

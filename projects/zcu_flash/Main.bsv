@@ -139,12 +139,12 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	Vector#(NumWriteClients, MemWriteEngine#(DataBusWidth, DataBusWidth,  1, TDiv#(NUM_ENG_PORTS,NumWriteClients))) we <- replicateM(mkMemWriteEngine);
 
 	function MemReadEngineServer#(DataBusWidth) getREServer( Vector#(NumReadClients, MemReadEngine#(DataBusWidth, DataBusWidth, 14, TDiv#(NUM_ENG_PORTS,NumReadClients))) rengine, Integer idx ) ;
-		let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumReadClients));
-		let idxEngine = idx / numEngineServer;
-		let idxServer = idx % numEngineServer;
+		//let numEngineServer = valueOf(TDiv#(NUM_ENG_PORTS,NumReadClients));
+		//let idxEngine = idx / numEngineServer;
+		//let idxServer = idx % numEngineServer;
 
-		//let idxEngine = idx % valueOf(NumReadClients);
-		//let idxServer = idx / valueOf(NumReadClients);
+		let idxEngine = idx % valueOf(NumReadClients);
+		let idxServer = idx / valueOf(NumReadClients);
 
 		return rengine[idxEngine].readServers[idxServer];
 		//return rengine[idx].readServers[0];
