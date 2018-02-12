@@ -1,6 +1,5 @@
 package AuroraCommon;
 
-
 import FIFO::*;
 import Clocks :: *;
 import DefaultValue :: *;
@@ -13,8 +12,7 @@ import ConnectalClocks::*;
 typedef 2 AuroraExtCount;
 //typedef 4 AuroraExtQuad; // defined in zynq_multinode (?)
 
-// Clock module for init_clk
-// To make timing constraints easier
+/* Example ClockDiv Code */
 interface ClockDiv4Ifc;
 	interface Clock slowClock;
 endinterface
@@ -26,20 +24,61 @@ module mkClockDiv4#(Clock fastClock) (ClockDiv4Ifc);
 	Clock bufg <- mkClockBUFG(clocked_by clockdiv4.slowClock);
 
 	interface slowClock = bufg;
-	//interface slowClock = clockdiv4.slowClock;
 endmodule
+
+/* Aurora-related Pins */
+`ifndef BSIM
+(* always_enabled, always_ready *)
+`endif
+interface Aurora_Pins#(numeric type lanes);
+	(* prefix = "" *)
+	method Action rxn_in((* port = "RXN" *) Bit#(lanes) rxn_i);
+	(* prefix = "" *)
+	method Action rxp_in((* port = "RXP" *) Bit#(lanes) rxp_i);
+
+	(* result = "TXN" *)
+	method Bit#(lanes) txn_out();
+	(* result = "TXP" *)
+	method Bit#(lanes) txp_out();
+endinterface
 
 `ifndef BSIM
 (* always_enabled, always_ready *)
 `endif
 interface Aurora_Clock_Pins;
-	//(* prefix = "", result = "" *)
-	method Action gtx_clk_p(Bit#(1) v);
-	//(* prefix = "", result = "" *)
-	method Action gtx_clk_n(Bit#(1) v);
+	method Action gt_clk_p(Bit#(1) v);
+	method Action gt_clk_n(Bit#(1) v);
 	
-	interface Clock gtx_clk_p_deleteme_unused_clock;
-	interface Clock gtx_clk_n_deleteme_unused_clock;
+	/* below to be removed by script -- needed for Action methods above */
+	// interface Clock gt_clk_p_deleteme_unused_clock;
+	// interface Clock gt_clk_n_deleteme_unused_clock;
+endinterface
+
+/* Aurora User Interface */
+interface AuroraStatus#(numeric type lanes);
+	method Bit#(1) channel_up;
+	method Bit#(lanes) lane_up;
+	method Bit#(1) hard_err;
+	method Bit#(1) soft_err;
+	method Bit#(8) data_err_count; 
+endinterface
+
+interface AuroraUserIfc#(numeric type lanes, numeric type width);
+	//interface Reset aurora_rst_n; # not needed at the first place?
+	interface AuroraStatus#(lanes) status;
+
+	method Action send(Bit#(width) tx);
+	method ActionValue#(Bit#(width)) receive();
+endinterface
+
+/* Interfaces for BVI wrapper */
+interface AuroraImportIfc#(numeric type lanes);
+	interface Clock aurora_clk;
+	interface Reset aurora_rst;
+	(* prefix = "" *)
+	interface Aurora_Pins#(lanes) aurora;
+	(* prefix = "" *)
+	interface AuroraUserIfc#(lanes, TMul#(lanes,32)) user;
 endinterface
 
 interface AuroraExtImportIfc#(numeric type lanes);
@@ -61,112 +100,60 @@ interface AuroraExtImportIfc#(numeric type lanes);
 	(* prefix = "" *)
 	interface Aurora_Pins#(1) aurora3;
 	(* prefix = "" *)
-	interface AuroraControllerIfc#(64) user0;
+	interface AuroraUserIfc#(4, 64) user0;
 	(* prefix = "" *)
-	interface AuroraControllerIfc#(64) user1;
+	interface AuroraUserIfc#(4, 64) user1;
 	(* prefix = "" *)
-	interface AuroraControllerIfc#(64) user2;
+	interface AuroraUserIfc#(4, 64) user2;
 	(* prefix = "" *)
-	interface AuroraControllerIfc#(64) user3;
+	interface AuroraUserIfc#(4, 64) user3;
 
 	`ifdef BSIM
 	method Action setNodeIdx(Bit#(8) idx);
 	`endif
 endinterface
 
-interface AuroraImportIfc#(numeric type lanes);
-	interface Clock aurora_clk;
-	interface Reset aurora_rst;
-	(* prefix = "" *)
-	interface Aurora_Pins#(lanes) aurora;
-	(* prefix = "" *)
-	interface AuroraControllerIfc#(TMul#(lanes,32)) user;
-endinterface
-
-interface AuroraControllerIfc#(numeric type width);
-	interface Reset aurora_rst_n;
-		
-	method Bit#(1) channel_up;
-	method Bit#(4) lane_up;
-	method Bit#(1) hard_err;
-	method Bit#(1) soft_err;
-	method Bit#(8) data_err_count;
-
-	method Action send(Bit#(width) tx);
-	method ActionValue#(Bit#(width)) receive();
-endinterface
-
-`ifndef BSIM
-(* always_enabled, always_ready *)
-`endif
-interface Aurora_Pins#(numeric type lanes);
-	(* prefix = "", result = "RXN" *)
-	method Action rxn_in(Bit#(lanes) rxn_i);
-	(* prefix = "", result = "RXP" *)
-	method Action rxp_in(Bit#(lanes) rxp_i);
-
-	(* prefix = "", result = "TXN" *)
-	method Bit#(lanes) txn_out();
-	(* prefix = "", result = "TXP" *)
-	method Bit#(lanes) txp_out();
-endinterface
-
-interface GtxClockImportIfc;
+/* GT clock import */
+interface GtClockImportIfc;
 	interface Aurora_Clock_Pins aurora_clk;
-	interface Clock gtx_clk_p_ifc;
-	interface Clock gtx_clk_n_ifc;
+	interface Clock gt_clk_p_ifc;
+	interface Clock gt_clk_n_ifc;
 endinterface
 
 (* synthesize *)
-module mkGtxClockImport (GtxClockImportIfc);
+module mkGtClockImport (GtClockImportIfc);
 `ifndef BSIM
-	//B2C i_gtx_clk_p <- mkB2C();
-	//B2C i_gtx_clk_n <- mkB2C();
+	B2C1 i_gt_clk_p <- mkB2C1();
+	B2C1 i_gt_clk_n <- mkB2C1();
 
-	// To avoid errors in synthesis (ZCU102, Vivado 2016.4 <= )
-	B2C1 i_gtx_clk_p <- mkB2C1();
-	B2C1 i_gtx_clk_n <- mkB2C1();
 	Clock clk <- exposeCurrentClock;
-//	let i_gtx_clk_p_ibuf <- mkIBUF(defaultValue);
-//	let i_gtx_clk_n_ibuf <- mkIBUF(defaultValue);
-
-//	(* fire_when_enabled, no_implicit_conditions *)
-//	rule ibuf_to_b2c_p;
-//		i_gtx_clk_p.inputclock(i_gtx_clk_p_ibuf);
-//	endrule
-//	(* fire_when_enabled, no_implicit_conditions *)
-//	rule ibuf_to_b2c_n;
-//		i_gtx_clk_n.inputclock(i_gtx_clk_n_ibuf);
-//	endrule
 
 	interface Aurora_Clock_Pins aurora_clk;
-	method Action gtx_clk_p(Bit#(1) v);
-		i_gtx_clk_p.inputclock(v);
-		//i_gtx_clk_p_ibuf <= v;
-	endmethod
-	method Action gtx_clk_n(Bit#(1) v);
-		i_gtx_clk_n.inputclock(v);
-		//i_gtx_clk_n_ibuf <= v;
-	endmethod
+		method Action gt_clk_p(Bit#(1) v) = i_gt_clk_p.inputclock(v);
+		method Action gt_clk_n(Bit#(1) v) = i_gt_clk_n.inputclock(v);
 
-	interface Clock gtx_clk_p_deleteme_unused_clock = clk;
-	interface Clock gtx_clk_n_deleteme_unused_clock = clk;
-	//interface Clock gtx_clk_p_deleteme_unused_clock = i_gtx_clk_p.c; // These clocks are deleted from the netlist by the synth.tcl script
-	//interface Clock gtx_clk_n_deleteme_unused_clock = i_gtx_clk_n.c;
+		// These clocks are deleted from the netlist by the synth.tcl script
+		// interface Clock gt_clk_p_deleteme_unused_clock = clk;
+		// interface Clock gt_clk_n_deleteme_unused_clock = clk;
 	endinterface
-	//interface Clock gtx_clk = gtx_clk_i;
-	interface Clock gtx_clk_p_ifc = i_gtx_clk_p.c;
-	interface Clock gtx_clk_n_ifc = i_gtx_clk_n.c;
+
+	interface Clock gt_clk_p_ifc = i_gt_clk_p.c;
+	interface Clock gt_clk_n_ifc = i_gt_clk_n.c;
 `else
 	Clock clk <- exposeCurrentClock;
 	
 	interface Aurora_Clock_Pins aurora_clk;
-	interface Clock gtx_clk_p_deleteme_unused_clock = clk; // These clocks are deleted from the netlist by the synth.tcl script
-	interface Clock gtx_clk_n_deleteme_unused_clock = clk;
+		method Action gt_clk_p(Bit#(1) v) = noAction;
+		method Action gt_clk_n(Bit#(1) v) = noAction;
+
+		// These clocks are deleted from the netlist by the synth.tcl script
+		// interface Clock gt_clk_p_deleteme_unused_clock = clk; 
+		// interface Clock gt_clk_n_deleteme_unused_clock = clk;
 	endinterface
-	//interface Clock gtx_clk = gtx_clk_i;
-	interface Clock gtx_clk_p_ifc = clk;
-	interface Clock gtx_clk_n_ifc = clk;
+
+	interface Clock gt_clk_p_ifc = clk;
+	interface Clock gt_clk_n_ifc = clk;
 `endif
 endmodule
+
 endpackage: AuroraCommon

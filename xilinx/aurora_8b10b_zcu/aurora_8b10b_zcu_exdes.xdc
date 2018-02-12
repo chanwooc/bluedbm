@@ -51,10 +51,10 @@
 ################################################################################
 ## XDC generated for xczu9eg-ffvb1156-2 device
 # 275.0MHz GT Reference clock constraint
-create_clock -name GT_REFCLK1 -period 3.636	 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
+create_clock -name GT_REFCLK1 -period 3.636	 [get_ports aurora_clk_fmc1_gt_clk_p_v]
 ####################### GT reference clock LOC #######################
-set_property LOC L8 [get_ports aurora_clk_fmc1_gtx_clk_p_v]
-set_property LOC L7 [get_ports aurora_clk_fmc1_gtx_clk_n_v]
+set_property LOC L8 [get_ports aurora_clk_fmc1_gt_clk_p_v]
+set_property LOC L7 [get_ports aurora_clk_fmc1_gt_clk_n_v]
 
 # 20.0 ns period Board Clock Constraint -> changed to 110 MHz Derived Board Clock
 #create_clock -name auroraI_init_clk_i -period 20.0 [get_nets -hierarchical -filter { NAME =~ "*auroraIntraClockDiv4_CLK_slowClock" }]

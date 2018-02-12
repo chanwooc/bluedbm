@@ -76,7 +76,7 @@ module aurora_8b10b_zcu_exdes #
     tx_rdy,
 
     USER_CLK,
-    USER_RST,
+    //USER_RST,
     USER_RST_N,
 
     // User IO
@@ -112,7 +112,7 @@ input tx_en;
 output tx_rdy;
 
 output USER_CLK;
-output USER_RST;
+//output USER_RST;
 output USER_RST_N;
 
     // User I/O
@@ -139,7 +139,7 @@ input              GT_REFCLK_N;
 	wire GT_RESET_IN;
 	assign GT_RESET_IN = ~GT_RESET_N;
 	assign USER_CLK = user_clk_i;
-	assign USER_RST = system_reset_i;
+	//assign USER_RST = system_reset_i;
 	assign USER_RST_N = !system_reset_i;
 	
 	assign tx_tvalid_i = tx_en;
@@ -242,7 +242,7 @@ wire               gtreset_vio_o;
 (* mark_debug = "true" *)wire    [2:0]      loopback_vio_i;
 wire    [2:0]      loopback_vio_o;
     //Frame check signals
-(* mark_debug = "true" *)  wire    [0:7]      err_count_i;
+(* mark_debug = "true" *)  wire    [0:7]      err_count_i = 0;
 
 
     wire [35:0] icon_to_vio_i;

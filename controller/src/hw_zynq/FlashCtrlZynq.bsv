@@ -20,17 +20,6 @@ import AuroraImportZynq::*;
 import ControllerTypes::*;
 import StreamingSerDes::*;
 
-//defined in controllertypes.bsv
-/*
-interface FlashCtrlUser;
-	method Action sendCmd (FlashCmd cmd);
-	method Action writeWord (Bit#(128) data, TagT tag);
-	method ActionValue#(Tuple2#(Bit#(128), TagT)) readWord ();
-	method ActionValue#(TagT) writeDataReq();
-	method ActionValue#(Tuple2#(TagT, StatusT)) ackStatus ();
-endinterface
-*/
-
 typedef TMul#(2, TAdd#(128, TLog#(NumTags))) SerInSz;
 
 interface FCZynqDebug;
@@ -223,10 +212,10 @@ module mkFlashCtrlZynq#(
 		method Tuple4#(Bit#(32), Bit#(32), Bit#(32), Bit#(32)) getDebugCnts = auroraIntra.getDebugCnts;
 		method Bit#(LedsWidth) getAuroraStatus; //Chanwoo
 			Bit#(LedsWidth) ret = 0;
-			ret[0] = auroraIntra.channel_up;
-			ret[4:1] = auroraIntra.lane_up;
-			ret[5] = auroraIntra.hard_err;
-			ret[6] = auroraIntra.soft_err;
+			ret[0] = auroraIntra.status.channel_up;
+			ret[4:1] = auroraIntra.status.lane_up;
+			ret[5] = auroraIntra.status.hard_err;
+			ret[6] = auroraIntra.status.soft_err;
 			return ret;
 		endmethod
 	endinterface
@@ -234,8 +223,3 @@ module mkFlashCtrlZynq#(
 	interface Aurora_Pins aurora = auroraIntra.aurora;
 
 endmodule
-
-
-
-
-

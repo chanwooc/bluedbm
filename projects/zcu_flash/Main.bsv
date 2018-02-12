@@ -125,11 +125,11 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 	//--------------------------------------------
 	// Flash Controller
 	//--------------------------------------------
-	GtxClockImportIfc gtx_clk_fmc1 <- mkGtxClockImport;
+	GtClockImportIfc gt_clk_fmc1 <- mkGtClockImport;
 	`ifdef BSIM
-		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlModel(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
+		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlModel(gt_clk_fmc1.gt_clk_p_ifc, gt_clk_fmc1.gt_clk_n_ifc, clk200);
 	`else
-		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlZynq(gtx_clk_fmc1.gtx_clk_p_ifc, gtx_clk_fmc1.gtx_clk_n_ifc, clk200);
+		FlashCtrlZynqIfc flashCtrl <- mkFlashCtrlZynq(gt_clk_fmc1.gt_clk_p_ifc, gt_clk_fmc1.gt_clk_n_ifc, clk200);
 	`endif
 
 	//--------------------------------------------
@@ -551,7 +551,7 @@ module mkMain#(Clock derivedClock, Reset derivedReset, FlashIndication indicatio
 
 	interface Top_Pins pins;
 		interface aurora_fmc1 = flashCtrl.aurora;
-		interface aurora_clk_fmc1 = gtx_clk_fmc1.aurora_clk;
+		interface aurora_clk_fmc1 = gt_clk_fmc1.aurora_clk;
 		interface LEDS leds;
 			method Bit#(LedsWidth) leds = flashCtrl.debug.getAuroraStatus;
 		endinterface
